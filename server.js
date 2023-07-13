@@ -20,17 +20,9 @@ const FOUNDATION_ADD = "sys1q6u9ey7qjh3fmnz5gsghcmpnjlh2akem4xm38sw";
 
 // requires
 const express = require("express");
-const request = require("request");
-const mongoose = require("mongoose");
-const base64 = require("js-base64");
-const axios = require("axios");
-const HDWallet = require("ethereum-hdwallet");
 const ethers = require("ethers");
 
 const provider = new ethers.providers.JsonRpcProvider(config.nevm.rpcUrl);
-const wallet = new ethers.Wallet.fromMnemonic(config.nevm.mnemonic);
-
-const signer = provider.getSigner();
 
 const BigNumber = require("bignumber.js");
 BigNumber.config({ DECIMAL_PLACES: 8 });
@@ -59,33 +51,14 @@ const client = new Discord.Client();
 const db = require("./db.js");
 db.connect();
 
-const sjs = require("syscoinjs-lib");
 // blockbook URL
 const backendURL = config.blockURL;
 // 'null' for no password encryption for local storage and 'true' for testnet
-const HDSigner = new sjs.utils.HDSigner(config.mnemonic, null, config.testnet);
-const hdWallet = HDWallet.fromMnemonic(config.nevm.mnemonic).derive(
-  HDWallet.DefaultHDPath
-);
-
-var receiveIndex = ls.get("receiveIndex");
-if (receiveIndex) {
-  HDSigner.receivingIndex = Number(receiveIndex);
-} else {
-  ls.set("receiveIndex", HDSigner.receivingIndex);
-}
-const syscoinjs = new sjs.SyscoinJSLib(HDSigner, backendURL);
-const BN = sjs.utils.BN;
 
 const auctions = require("./auctions.js");
-const endWatcher = require("./endWatcher.js")(client);
-const giveaways = require("./giveaway.js");
 const missions = require("./missions.js");
-const qr = require("./qr.js");
-const tips = require("./tips.js");
-const trades = require("./trades.js");
+
 const utils = require("./utils.js");
-const withdraws = require("./withdraws.js");
 const nevm = require("./nevm");
 
 // Constants required
@@ -146,25 +119,6 @@ client.on("ready", () => {
   client.user.setActivity(`#tips - !help `, { type: "PLAYING" });
 });
 
-const checkHouseProfile = async () => {
-  // create house profile
-  let profileExists = await ifProfile("houseprofile");
-  if (!profileExists) {
-    const createHouseProfile = async () => {
-      let accountIndex = HDSigner.createAccount() - 1;
-      HDSigner.setAccountIndex(accountIndex);
-      let newAddress = await HDSigner.getNewReceivingAddress();
-      ls.set("receiveIndex", HDSigner.receivingIndex);
-      console.log(ls.get("receiveIndex"));
-      let profile = await db.createProfile("houseprofile", newAddress);
-      let sysBalance = await db.createBalance("houseprofile", "SYS", 0);
-    };
-    createHouseProfile();
-  }
-};
-
-checkHouseProfile();
-
 client.on("message", async (message) => {
   try {
     if (message.author.bot) {
@@ -218,19 +172,11 @@ client.on("message", async (message) => {
       case "help":
         switch (message.channel.id) {
           case config.tradeChannel:
-            message.channel.send({
-              embed: {
-                color: c.SUCCESS_COL,
-                description: constants.help("trade"),
-              },
-            });
-            break;
-
           case config.auctionChannel:
             message.channel.send({
               embed: {
                 color: c.SUCCESS_COL,
-                description: constants.help("auction"),
+                description: `${command} command is not supported.`,
               },
             });
             break;
@@ -246,21 +192,12 @@ client.on("message", async (message) => {
 
           case config.tipChannel:
           default: {
-            if (args.length > 0 && args[0].toLowerCase() === "nevm") {
-              message.channel.send({
-                embed: {
-                  color: c.SUCCESS_COL,
-                  description: constants.help("main-nevm"),
-                },
-              });
-            } else {
-              message.channel.send({
-                embed: {
-                  color: c.SUCCESS_COL,
-                  description: constants.help("main"),
-                },
-              });
-            }
+            message.channel.send({
+              embed: {
+                color: c.SUCCESS_COL,
+                description: constants.help("main"),
+              },
+            });
             break;
           }
         }
@@ -279,377 +216,20 @@ client.on("message", async (message) => {
 
       case "dep":
       case "deposit":
-        try {
-          if (args.length > 0 && args[0].toLowerCase() === "nevm") {
-            return nevm.deposit(message);
-          }
-          var myProfile = await db.getProfile(message.author.id);
-          if (myProfile) {
-            let desc =
-              `Hi, **<@${message.author.id}>** Any coins/tokens sent to this address will be added to your ${config.botname} balance within a few minutes.` +
-              `\n\n:warning: IMPORTANT: Make sure that all transactions sent to this deposit address have been confirmed at least once before using the !balance command, otherwise your funds might be lost. :warning:\n\nYour personal deposit address:\n\n${myProfile.address}`;
-
-            try {
-              var qrPath = await qr.getQR(myProfile.userID);
-              var attachment = new Discord.MessageAttachment(qrPath);
-            } catch (error) {
-              console.log("Error getting qrpath");
-              console.log(error);
-            }
-
-            var embed = new Discord.MessageEmbed()
-              .setColor(c.SUCCESS_COL)
-              .setDescription(desc);
-
-            if (qrPath) {
-              embed
-                .attachFiles(attachment)
-                .setImage(`attachment://${message.author.id}.png`);
-            }
-
-            message.author.send(embed);
-          }
-        } catch (error) {
-          console.log(error);
-        }
-        break;
-
-      case "block":
-      case "blocks":
-      case "blockchain":
-        const getBlockCount = async () => {
-          try {
-            const resp = await axios.get(`${backendURL}/api`);
-            var bb = resp.data.blockbook;
-            var backend = resp.data.backend;
-            var blockSize = new BigNumber(backend.sizeOnDisk);
-            var blockSizeGB = utils.toWholeUnit(blockSize, 9).toFixed(3);
-
-            message.channel.send({
-              embed: {
-                color: c.SUCCESS_COL,
-                description:
-                  `Block Height: ${backend.blocks}` +
-                  `\nSubversion: ${backend.subversion}` +
-                  `\nDifficulty: ${backend.difficulty}` +
-                  `\nMempool Size: ${bb.mempoolSize}` +
-                  `\nSize on Disk: ~${blockSizeGB} GB`,
-              },
-            });
-          } catch (error) {
-            message.channel
-              .send({
-                embed: {
-                  color: c.FAIL_COL,
-                  description:
-                    "Unable to get the blockchain data. Please try again later.",
-                },
-              })
-              .then((msg) => {
-                utils.deleteMsgAfterDelay(msg, 15000);
-              });
-            console.error(error);
-          }
-        };
-        getBlockCount();
+        nevm.deposit(message);
         break;
 
       case "withdraw":
       case "withdrawal":
         // withdraws the specified amount of SYS and SPTs from a user's tipbot account
 
-        if (
-          message.channel.id == config.tipChannel ||
-          message.channel.type === "dm"
-        ) {
-          console.log("withdawal args", args);
-          if (args.length >= 3 && args[2].toLocaleLowerCase() === "nevm") {
-            return nevm.withdraw(client, message, args, provider);
-          }
-          withdraws.withdraw(args, message, client, HDSigner, syscoinjs);
-        }
-        break;
+        return nevm.withdraw(client, message, args, provider);
 
       case "bal":
       case "balance":
         // used to check a user's balance and to deposit tokens if they have any in their deposit address
         // will then change the deposit address to a new receive address
-        try {
-          if (
-            message.channel.id == config.tipChannel ||
-            message.channel.id == config.tradeChannel ||
-            message.channel.id == config.auctionChannel ||
-            message.channel.id == config.missionChannel ||
-            message.channel.id == config.giveawayChannel ||
-            message.channel.type == "dm"
-          ) {
-            if (args.length > 0 && args[0].toLowerCase() === "nevm") {
-              return nevm.balance(client, message, args, provider);
-            }
-
-            // get the relevant profile's info
-            const userProfile = await db.getProfile(message.author.id);
-
-            if (userProfile != undefined) {
-              client.users.fetch(message.author.id).then((user) => {
-                const makeBalTransferPrivate = async () => {
-                  var actionStr = "";
-                  let options = { details: "tokenBalances" };
-                  const backendAccount = await sjs.utils.fetchBackendAccount(
-                    backendURL,
-                    userProfile.address,
-                    options
-                  );
-
-                  const depBalance = new BigNumber(backendAccount.balance);
-                  var balWasUpdated = false;
-                  // check and add any sys within the deposit address to the profile's balance
-                  // new addresses are dusted to make sure explorer derives them, so check if deposit
-                  // amount is greater than the 1000 sat dust
-                  if (depBalance.gt(1000)) {
-                    var sysBalance = await db.getBalance(
-                      message.author.id,
-                      "SYS"
-                    );
-                    var sysBalance = new BigNumber(sysBalance.amount);
-
-                    actionStr += `[SYS | deposit: ${depBalance.toString()} | `;
-                    actionStr += `new balance: ${sysBalance.toString()}]`;
-
-                    var updatedAmount = sysBalance.plus(depBalance);
-                    var profileUpdated = await db.editBalanceAmount(
-                      message.author.id,
-                      "SYS",
-                      updatedAmount
-                    );
-                    if (profileUpdated) {
-                      balWasUpdated = true;
-                    }
-                  }
-                  // check and add any tokens within the deposit address to the profile's balances
-                  var tokens = backendAccount.tokens;
-                  if (tokens != undefined) {
-                    if (tokens.length > 0) {
-                      for (var i = 0; i < tokens.length; i++) {
-                        if (Number(tokens[i].balance) > 0) {
-                          var userTokenBal = await db.getBalance(
-                            message.author.id,
-                            tokens[i].assetGuid
-                          );
-                          if (!userTokenBal) {
-                            var userNewTokenBal = await db.createBalance(
-                              message.author.id,
-                              tokens[i].assetGuid,
-                              tokens[i].balance
-                            );
-                            if (userNewTokenBal) {
-                              balWasUpdated = true;
-                            }
-                          } else {
-                            var oldTokenBal = new BigNumber(
-                              userTokenBal.amount
-                            );
-                            var tokenDeposit = new BigNumber(tokens[i].balance);
-                            var newAmount = oldTokenBal.plus(tokenDeposit);
-
-                            actionStr += ` [${base64
-                              .decode(tokens[i].symbol)
-                              .toUpperCase()} (${
-                              tokens[i].assetGuid
-                            }) deposit: ${tokens[i].balance} | `;
-                            actionStr += `new balance: ${newAmount.toString()}]`;
-
-                            var userUpdatedTokenBal =
-                              await db.editBalanceAmount(
-                                message.author.id,
-                                tokens[i].assetGuid,
-                                newAmount
-                              );
-                            if (userUpdatedTokenBal) {
-                              balWasUpdated = true;
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                  var newAddress;
-                  if (balWasUpdated) {
-                    var rIndex = ls.get("receiveIndex");
-                    actionStr += ` || Receive Index: ${rIndex} || Address: ${userProfile.address}`;
-
-                    newAddress = await HDSigner.getNewReceivingAddress();
-                    ls.set("receiveIndex", HDSigner.receivingIndex);
-                    var profileNewAdd = await db.editProfileAddress(
-                      message.author.id,
-                      newAddress
-                    );
-                    if (!profileNewAdd) {
-                      console.log(
-                        "Error changing profile's address: " + message.author.id
-                      );
-                    }
-                  }
-
-                  if (actionStr.length > 0) {
-                    let log = await db.createLog(
-                      message.author.id,
-                      actionStr,
-                      [],
-                      0
-                    );
-                  }
-
-                  let profileBals = await db.getBalances(message.author.id);
-                  let sysBal = await db.getBalance(message.author.id, "SYS");
-                  // create the balance string showing all sys and token balances
-                  // stored in profile
-                  var token;
-                  let balString = `SYS: ${utils
-                    .toWholeUnit(new BigNumber(sysBal.amount), 8)
-                    .toString()}\n`;
-                  for (let i = 0; i < profileBals.length; i++) {
-                    let cc = profileBals[i];
-                    if (cc["currencyID"] !== "SYS") {
-                      for (let key in cc) {
-                        if (key === "currencyID") {
-                          var token = await utils.getSPT(cc[key]);
-
-                          if (!token) {
-                            break;
-                          }
-
-                          let symbol = base64
-                            .decode(token.symbol)
-                            .toUpperCase();
-                          let tokenStr = `${symbol} (${token.assetGuid})`;
-                          let currencyStr = await utils.getExpLink(
-                            token.assetGuid,
-                            c.TOKEN,
-                            tokenStr
-                          );
-
-                          balString += currencyStr;
-                          balString += ": ";
-                        }
-                        if (key === "amount") {
-                          if (token != undefined) {
-                            balString += utils
-                              .toWholeUnit(
-                                new BigNumber(cc[key]),
-                                token.decimals
-                              )
-                              .toString();
-                          } else {
-                            balString += utils
-                              .toWholeUnit(new BigNumber(cc[key]), 8)
-                              .toString();
-                          }
-                        }
-                      }
-                    }
-                    if (i + 1 != profileBals.length) {
-                      balString += "\n";
-                    }
-                    token = undefined;
-                  }
-
-                  try {
-                    user.send({
-                      embed: {
-                        color: c.SUCCESS_COL,
-                        description: `<\@${
-                          message.author.id
-                        }> has:\n ${balString.toLocaleString()}`,
-                      },
-                    });
-                  } catch (error) {
-                    console.log(`Error sending DM to ${message.author.id}`);
-                    console.log(error);
-                    message.channel
-                      .send({
-                        embed: {
-                          color: c.FAIL_COL,
-                          description: `Can't send balance to <@${message.author.id}>. Do you have DMs from non-friends turned off?`,
-                        },
-                      })
-                      .then((msg) => {
-                        utils.deleteMsgAfterDelay(msg, 15000);
-                      });
-                  }
-
-                  if (balWasUpdated) {
-                    let desc =
-                      `A new deposit address has been created for you, do NOT send any more funds to the previous deposit address.\n\n` +
-                      `:warning: IMPORTANT: Make sure that all transactions sent to this new deposit address have been confirmed at least once before using the !balance command, otherwise your funds might be lost. :warning:\n\n${newAddress}`;
-                    try {
-                      var qrPath = await qr.getQR(message.author.id);
-                      var attachment = new Discord.MessageAttachment(qrPath);
-                    } catch (error) {
-                      console.log("Error getting qrpath");
-                      console.log(error);
-                    }
-
-                    var embed = new Discord.MessageEmbed()
-                      .setColor(c.SUCCESS_COL)
-                      .setDescription(desc);
-
-                    if (qrPath) {
-                      embed
-                        .attachFiles(attachment)
-                        .setImage(`attachment://${message.author.id}.png`);
-                    }
-
-                    try {
-                      user.send(embed);
-                    } catch (error) {
-                      console.log(`Error sending DM to ${message.author.id}`);
-                      console.log(error);
-                      message.channel
-                        .send({
-                          embed: {
-                            color: c.FAIL_COL,
-                            description: `Can't message <@${message.author.id}>. Do you have DMs from non-friends turned off?`,
-                          },
-                        })
-                        .then((msg) => {
-                          utils.deleteMsgAfterDelay(msg, 15000);
-                        });
-                    }
-                  }
-                };
-                makeBalTransferPrivate();
-              });
-              if (!message.channel.type === "dm") {
-                message.channel
-                  .send({
-                    embed: {
-                      color: c.SUCCESS_COL,
-                      description: `:rolling_eyes::point_up: <@${message.author.id}>, I've sent your balance in a private message.`,
-                    },
-                  })
-                  .then((msg) => {
-                    utils.deleteMsgAfterDelay(msg, 15000);
-                  });
-              }
-            } else {
-              message.channel
-                .send({
-                  embed: {
-                    color: c.FAIL_COL,
-                    description: `Use ${prefix}register to create a ${config.botname} profile!`,
-                  },
-                })
-                .then((msg) => {
-                  utils.deleteMsgAfterDelay(msg, 15000);
-                });
-              return false;
-            }
-          }
-        } catch (error) {
-          console.log(error);
-        }
-        break;
+        return nevm.balance(client, message, args, provider);
 
       case "foundation":
         let backendAccount = null;
@@ -687,110 +267,6 @@ client.on("message", async (message) => {
           .then((msg) => {
             utils.deleteMsgAfterDelay(msg, 25000);
           });
-        break;
-
-      case "verifytoken":
-        // verify a token so that users can refer to a token with its symbol instead of guid
-
-        try {
-          if (!utils.checkAdminRole(message)) {
-            message.channel
-              .send({
-                embed: {
-                  color: c.FAIL_COL,
-                  description:
-                    "Sorry, you do not have the required permission.",
-                },
-              })
-              .then((msg) => {
-                utils.deleteMsgAfterDelay(msg, 15000);
-              });
-            return;
-          }
-
-          let token;
-          if (args[0] !== undefined) {
-            token = await sjs.utils.fetchBackendAsset(backendURL, args[0]);
-            if (token.assetGuid == undefined) {
-              message.channel
-                .send({
-                  embed: {
-                    color: c.FAIL_COL,
-                    description:
-                      "Cannot find a SPT with the given GUID. Please ensure it's correct.",
-                  },
-                })
-                .then((msg) => {
-                  utils.deleteMsgAfterDelay(msg, 15000);
-                });
-              return;
-            }
-
-            let symbol;
-            if (args[1].length > 0) {
-              symbol = args[1].toUpperCase();
-            } else {
-              symbol = base64.decode(token.symbol).toUpperCase();
-            }
-            let sptExists = await db.getSPT(symbol);
-            let guidExists = await db.getSPT(token.assetGuid);
-
-            if (sptExists || guidExists) {
-              message.channel
-                .send({
-                  embed: {
-                    color: c.FAIL_COL,
-                    description: "Token symbol/guid already in use.",
-                  },
-                })
-                .then((msg) => {
-                  utils.deleteMsgAfterDelay(msg, 15000);
-                });
-              return;
-            }
-
-            let spt;
-            if (args[2] !== undefined) {
-              spt = await db.createSPT(symbol, token.assetGuid, args[2]);
-            } else {
-              spt = await db.createSPT(symbol, token.assetGuid, null);
-            }
-
-            if (spt) {
-              message.channel.send({
-                embed: {
-                  color: c.SUCCESS_COL,
-                  description: `Symbol ${symbol} has now been linked to GUID ${args[0]}`,
-                },
-              });
-            } else {
-              message.channel
-                .send({
-                  embed: {
-                    color: c.FAIL_COL,
-                    description:
-                      "Error verifying token and adding to database.",
-                  },
-                })
-                .then((msg) => {
-                  utils.deleteMsgAfterDelay(msg, 15000);
-                });
-            }
-          } else {
-            message.channel
-              .send({
-                embed: {
-                  color: c.FAIL_COL,
-                  description: `${prefix}${commandUsage.verifyToken}`,
-                },
-              })
-              .then((msg) => {
-                utils.deleteMsgAfterDelay(msg, 15000);
-              });
-          }
-        } catch (error) {
-          console.log(error);
-        }
         break;
 
       case "create":
@@ -1195,24 +671,13 @@ client.on("message", async (message) => {
             return;
           }
 
-          if (args[2].toLocaleLowerCase() === "nevm") {
-            return await nevm.send(
-              client,
-              message,
-              args,
-              myProfile,
-              await ifProfile(receiver.id),
-              provider
-            );
-          }
-
-          let tipSuccess = await tips.tipUser(
+          return await nevm.send(
+            client,
+            message,
             args,
             myProfile,
             await ifProfile(receiver.id),
-            false,
-            client,
-            message
+            provider
           );
         } catch (error) {
           console.log(error);
@@ -1230,10 +695,6 @@ client.on("message", async (message) => {
             message.channel.id == config.giveawayChannel ||
             message.channel.type === "dm"
           ) {
-            if (args.length > 0 && args[0].toLowerCase() === "nevm") {
-              return nevm.register(client, message, args);
-            }
-
             let profileExists = await ifProfile(message.author.id);
             if (profileExists) {
               message.channel
@@ -1247,157 +708,60 @@ client.on("message", async (message) => {
                 .then((msg) => {
                   utils.deleteMsgAfterDelay(msg, 15000);
                 });
-            } else {
-              let newAddress = await HDSigner.getNewReceivingAddress();
-              ls.set("receiveIndex", HDSigner.receivingIndex);
-
-              message.channel
-                .send({
-                  embed: {
-                    color: c.SUCCESS_COL,
-                    description: "Creating your account...",
-                  },
-                })
-                .then((msg) => {
-                  utils.deleteMsgAfterDelay(msg, 15000);
-                });
-
-              try {
-                // dust the address to make sure that the explorer derives more for this xpub
-                let txOpts = { rbf: false };
-                let xpub = HDSigner.getAccountXpub();
-                const feeRate = new BN(10);
-                let outputsArr = [{ address: newAddress, value: new BN(1000) }];
-                let change = await HDSigner.getNewChangeAddress();
-                var txResult = await syscoinjs.createTransaction(
-                  txOpts,
-                  change,
-                  outputsArr,
-                  feeRate,
-                  xpub
-                );
-                sentResult = await syscoinjs.signAndSend(
-                  txResult.res,
-                  null,
-                  HDSigner
-                );
-                console.log("Successfully dusted " + newAddress);
-                console.log(txResult.psbt.extractTransaction().getId());
-              } catch (error) {
-                console.log("Error dusting " + message.author.id);
-                console.log(error);
-              }
-
-              let profile = db.createProfile(message.author.id, newAddress);
-              let sysBalance = db.createBalance(message.author.id, "SYS", 0);
-              client.users.fetch(message.author.id).then((userMsg) => {
-                userMsg.send({
-                  embed: {
-                    color: c.SUCCESS_COL,
-                    description:
-                      "**Hello there <@" +
-                      message.author.id +
-                      ">!**\n\n" +
-                      ":grin: Greetings!  My name is **" +
-                      config.botname +
-                      "** and I am a bot in the " +
-                      config.cname +
-                      ` Discord server.  You are now registered and can access all of my commands. (Like **${prefix}help**)` +
-                      `\n\n:speech_balloon: All of my commands start with a ${prefix}\n` +
-                      "\n:atm: I'm also a pseudo-wallet and you can deposit/withdraw " +
-                      config.ctick +
-                      " and Syscoin Platform Tokens (SPTs) with me!" +
-                      "\n\nDisclaimer: This tipbot was coded and is hosted by Syscoin community members. Choosing to use this bot is done at your own risk and the " +
-                      "creators and hosters of this bot hold no responsibility if the unlikely loss of funds occurs. Do not send high value amounts of crypto to this bot.",
-                  },
-                });
-              });
-              var actionStr = `Register: ${message.author.id} || Receive Index: ${HDSigner.receivingIndex} | Address: ${newAddress}`;
-              console.log(actionStr);
-              let log = await db.createLog(message.author.id, actionStr, []);
+              return;
             }
+
+            message.channel
+              .send({
+                embed: {
+                  color: c.SUCCESS_COL,
+                  description: "Creating your account...",
+                },
+              })
+              .then((msg) => {
+                utils.deleteMsgAfterDelay(msg, 15000);
+              });
+
+            let profile = db.createProfile(message.author.id);
+            let sysBalance = db.createBalance(message.author.id, "SYS", 0);
+            client.users.fetch(message.author.id).then((userMsg) => {
+              userMsg.send({
+                embed: {
+                  color: c.SUCCESS_COL,
+                  description:
+                    "**Hello there <@" +
+                    message.author.id +
+                    ">!**\n\n" +
+                    ":grin: Greetings!  My name is **" +
+                    config.botname +
+                    "** and I am a bot in the " +
+                    config.cname +
+                    ` Discord server.  You are now registered and can access all of my commands. (Like **${prefix}help**)` +
+                    `\n\n:speech_balloon: All of my commands start with a ${prefix}\n` +
+                    "\n:atm: I'm also a pseudo-wallet and you can deposit/withdraw " +
+                    config.ctick +
+                    " with me!" +
+                    "\n\nDisclaimer: This tipbot was coded and is hosted by Syscoin community members. Choosing to use this bot is done at your own risk and the " +
+                    "creators and hosters of this bot hold no responsibility if the unlikely loss of funds occurs. Do not send high value amounts of crypto to this bot.",
+                },
+              });
+            });
+            var actionStr = `Register: ${message.author.id}`;
+            console.log(actionStr);
+            let log = await db.createLog(message.author.id, actionStr, []);
+            nevm.register(client, message, args);
           }
         } catch (error) {
           console.log(error);
         }
         break;
 
-      case "trade":
-        // creates a trade between the user creating the trade and another
-        // the tokens and the amount of each token to be traded must be specified
-        if (message.channel.id == config.tradeChannel) {
-          trades.createTrade(message, args);
-        }
-        break;
-
-      case "accept":
-      case "tradeaccept":
-        // accepts the trade with the given trade id
-        if (message.channel.id == config.tradeChannel) {
-          trades.acceptTrade(message, args, client);
-        }
-        break;
-
-      case "recent":
-      case "tradesrecent":
-        // retrieves and prints a list of the most recent trades
-        // a specific token can be defined for this
-        if (message.channel.id == config.tradeChannel) {
-          trades.recentTrades(message, args, client);
-        }
-        break;
-
-      case "auction":
-        // creates an auction for a specific token, time and reserve amount
-        if (message.channel.id == config.auctionChannel) {
-          auctions.createAuction(message, args);
-        }
-        break;
-
-      case "bid":
-        // bids on a specific auction for the amount given
-        if (message.channel.id == config.auctionChannel) {
-          auctions.bid(message, args);
-        }
-        break;
-
-      case "cancel":
-        // cancels a specific auction
-        if (message.channel.id == config.auctionChannel) {
-          auctions.cancelAuction(message, args);
-        }
-
-        // cancels the trade with the given trade id
-        if (message.channel.id == config.tradeChannel) {
-          trades.cancelTrade(message, args);
-        }
-        break;
-
-      case "show":
-        // retrieves and prints the information of the auction with the given ID
-        if (message.channel.id == config.auctionChannel) {
-          auctions.showAuction(message, args, client);
-        }
-        break;
-
-      case "find":
-        // retrieves and prints the information of auctions that include the given token
-        if (message.channel.id == config.auctionChannel) {
-          auctions.findAuctions(message, args, client);
-        }
-        break;
-
-      case "findold":
-        // retrieves and prints the information of old auctions that include the given token
-        if (message.channel.id == config.auctionChannel) {
-          auctions.findAuctions(message, args, client, true);
-        }
-        break;
-
-      case "giveaway":
+      case "giveaway": {
         // creates a giveaway that will randomly select a given number of users who react to the message
         // within a given time and will give the specified amount of SYS or SPTs to the selected winners
-        const canGiveAway = utils.checkAdminRole(message) || utils.checkMissionRunnerRole(message);
+        const canGiveAway =
+          utils.checkAdminRole(message) ||
+          utils.checkMissionRunnerRole(message);
         if (!canGiveAway) {
           message.channel
             .send({
@@ -1412,16 +776,33 @@ client.on("message", async (message) => {
           return;
         }
 
-        if(args.slice(-1)[0].toUpperCase() === 'NEVM') {
-          return await nevm.createGiveAway(message, args, client, provider);
-        }
+        return await nevm.createGiveAway(message, args, client, provider);
+      }
 
-        if ([config.giveawayChannel, config.rollCallChannel].includes(message.channel.id)) {
-          giveaways.createGiveaway(message, args, client);
-        }
-        break;
+      case "block":
+      case "blocks":
+      case "blockchain":
+
+      case "trade":
+      case "accept":
+      case "tradeaccept":
+      case "recent":
+      case "tradesrecent":
+      case "auction":
+      case "bid":
+      case "cancel":
+      case "show":
+      case "find":
+      case "findold":
 
       default:
+        message.channel.send({
+          embed: {
+            color: c.SUCCESS_COL,
+            description: `${command} command is not supported.`,
+          },
+        });
+        break;
     }
   } catch (err) {
     console.log(`Errors found:\n\`\`\`${err}\nAt ${err.stack}\`\`\``);

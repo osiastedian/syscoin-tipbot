@@ -33,10 +33,7 @@ async function registerNevm(client, message, args) {
       .send({
         embed: {
           color: constants.FAIL_COL,
-          description:
-            "You already registered for NEVM on your " +
-            config.botname +
-            " profile.",
+          description: `You already registered for ${config.networkName} on your ${config.botname} profile.`,
         },
       })
       .then((msg) => {
@@ -48,7 +45,7 @@ async function registerNevm(client, message, args) {
   nevmWallet = registerWallet(message.author.id);
 
   if (!nevmWallet) {
-    console.error("registerNevm", "Wallet creation failed");
+    console.error("register", "Wallet creation failed");
     return;
   }
 
@@ -56,7 +53,7 @@ async function registerNevm(client, message, args) {
   user.send({
     embed: {
       color: constants.SUCCESS_COL,
-      description: `You have successfully registered for NEVM on your ${config.botname} profile.\n`,
+      description: `You have successfully registered for ${config.networkName} on your ${config.botname} profile.\n`,
     },
   });
 }

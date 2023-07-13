@@ -5,38 +5,18 @@ const prefix = config.prefix;
 //Constant variables - Will not and should not be changed in the code
 function getHelpCommands(parm) {
   switch (parm) {
-    case "main":
-      return `
-      **Main Commands**
+    case "main": {
+      return `**Main Commands**
       ~~--------------------~~
-      **\`${prefix}register\`**  Creates a ${config.botname} profile to send/receive ${config.ctick} and Syscoin Platform Tokens (SPTs)!
+      **\`${prefix}register\`**  Creates a ${config.botname} profile to send/receive ${config.ctick}!
 
-      **\`${prefix}balance\`**  Views your current ${config.ctick} and SPT balances.
+      **\`${prefix}balance \`**  Views your current ${config.ctick} balance and token balances.
 
       **\`${prefix}deposit\`**  Gets your ${config.ctick} deposit address.
 
-      **\`${prefix}withdraw [address] [amount] [symbol/guid]\`**  Withdraw ${config.ctick} or SPTs to your personal wallet address.
+      **\`${prefix}withdraw [address] [amount] [token-name]\`**  Withdraw ${config.ctick} or tokens to your personal wallet address.
 
-      **\`${prefix}tip @user [amount] [symbol/guid]\`**  Send some ${config.ctick} or SPTs to another user.
-
-      **\`${prefix}foundation\`**  Find out more about the Syscoin Foundation.
-
-      **\`${prefix}help nevm\`**  Show help NEVM commands
-
-          `;
-
-    case "main-nevm": {
-      return `**Main NEVM Commands**
-      ~~--------------------~~
-      **\`${prefix}register nevm\`**  Creates a ${config.botname} NEVM profile to send/receive ${config.ctick} and Syscoin Platform Tokens (SPTs)!
-
-      **\`${prefix}balance nevm \`**  Views your current ${config.ctick} balance and token balances.
-
-      **\`${prefix}deposit nevm\`**  Gets your ${config.ctick} deposit address.
-
-      **\`${prefix}withdraw [address] [amount] nevm [token-name]\`**  Withdraw ${config.ctick} or tokens to your personal wallet address.
-
-      **\`${prefix}tip @user [amount] nevm [token-name]\`**  Send some ${config.ctick} or tokens to another user.
+      **\`${prefix}tip @user [amount] [token-name]\`**  Send some ${config.ctick} or tokens to another user.
       
           `;
     }
