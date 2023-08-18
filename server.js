@@ -12,8 +12,10 @@
  **/
 
 // variables
+require("dotenv").config();
 const c = require("./c.json");
 const config = require("./config.json");
+const tsOut = require("./dist/index.js");
 var prefix = config.prefix;
 const MESSAGE_CHAR_LIMIT = 1980;
 const FOUNDATION_ADD = "sys1q6u9ey7qjh3fmnz5gsghcmpnjlh2akem4xm38sw";
@@ -33,6 +35,8 @@ app.use(express.static("public"));
 app.get("/", function (request, response) {
   response.send("Running botserver");
 });
+
+tsOut.setUpControllers(app);
 
 const listener = app.listen(process.env.PORT, function () {
   console.log("Listening on port " + listener.address().port);
@@ -64,8 +68,6 @@ const nevm = require("./nevm");
 // Constants required
 const constants = require("./constants");
 const Log = require("./log");
-
-const tsOut = require("./dist/index.js");
 
 // constant functions - split string
 const splitString = (string, prepend = "", append = "") => {
