@@ -19,7 +19,7 @@ const sendUsageExample = (message) => {
   message.channel.send({
     embed: {
       color: constants.FAIL_COL,
-      description: `Usage: ${prefix}tip [user] [amount] nevm`,
+      description: `Usage: ${prefix}tip [user] [amount]`,
     },
   });
 };
@@ -98,7 +98,7 @@ async function send(
     return sendUsageExample(message);
   }
 
-  const [argUser, argValue, argNevm, argSymbol] = args;
+  const [argUser, argValue, argSymbol] = args;
 
   const senderWallet = await db.nevm.getNevmWallet(senderProfile.userID);
   const receiverWallet = await db.nevm.getNevmWallet(receiverProfile.userID);
@@ -108,8 +108,7 @@ async function send(
       .send({
         embed: {
           color: constants.FAIL_COL,
-          description:
-            "You don't have a nevm wallet yet. Use `!register nevm` to create one.",
+          description: `You don't have a ${config.networkName} wallet yet. Use \`!register\` to create one.`,
         },
       })
       .then((msg) => {
@@ -122,7 +121,7 @@ async function send(
       .send({
         embed: {
           color: constants.FAIL_COL,
-          description: `The user you are trying to send to doesn't have a nevm wallet yet. <@${receiverProfile.userID}> Use \`!register nevm\` to create one.`,
+          description: `The user you are trying to send to doesn't have a ${config.networkName} wallet yet. <@${receiverProfile.userID}> Use \`!register\` to create one.`,
         },
       })
       .then((msg) => {
@@ -186,7 +185,7 @@ async function send(
   }
 
   console.log("Sending Transaction...", { transactionConfig });
-  
+
   runTransaction(wallet.privateKey, transactionConfig, jsonRpc)
     .then((response) => {
       console.log("Transaction Sent!");

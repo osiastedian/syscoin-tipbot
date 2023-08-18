@@ -70,8 +70,7 @@ async function balance(client, message, args, jsonProvider) {
       .send({
         embed: {
           color: constants.FAIL_COL,
-          description:
-            "You don't have a nevm wallet yet. Use `!register nevm` to create one.",
+          description: `You don't have a ${config.networkName} wallet yet. Use \`!register\` to create one.`,
         },
       })
       .then((msg) => {

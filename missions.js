@@ -273,14 +273,14 @@ exports.createOrEditMission = async function (args, message, client, edit) {
         if (!suggesterNevmWallet) {
           const infoMessage = await message.reply({
             embed: {
-              description: `It seems @<${suggesterID}> don't have an NEVM wallet for this Mission.`,
+              description: `It seems @<${suggesterID}> don't have an ${config.networkName} wallet for this Mission.`,
             },
           });
           await registerWallet(suggesterID);
           await infoMessage.reply({
             embed: {
               color: c.SUCCESS_COL,
-              description: `Automatically created @<${suggesterID}>'s NEVM Wallet. Please run \`!deposit nevm\` to check your addresss.`,
+              description: `Automatically created @<${suggesterID}>'s ${config.networkName} Wallet. Please run \`!deposit\` to check your addresss.`,
             },
           });
         }
@@ -353,27 +353,19 @@ exports.listMissions = async function (args, message, client) {
     }
 
     let activeMissions = await db.getAllActiveMissions();
-    let utxoList = "UTXO:\n";
-    let nevmList = "NEVM:\n";
+
+    let missionList = `Missions:\n`;
     for (i = 0; i < activeMissions.length; i++) {
       const activeMission = activeMissions[i];
       const remainingTime = utils.getTimeDiffStr(activeMissions[i].endTime);
       const line = ` ***${activeMission.missionID}***: ends in ${remainingTime}\n`;
-      if (activeMission.nevm) {
-        nevmList += line;
-      } else {
-        utxoList += line;
-      }
-
-      if (utxoList === "UTXO:\n") {
-        utxoList += "-- EMPTY --";
-      }
+      missionList += line;
     }
 
     message.channel.send({
       embed: {
         color: c.SUCCESS_COL,
-        description: `Here are the active missions: \n ${nevmList} \n ${utxoList}`,
+        description: `Here are the active missions: \n ${missionList}`,
       },
     });
   } catch (error) {
@@ -1580,14 +1572,14 @@ exports.reportSubmit = async (message) => {
             if (!wallet) {
               const infoMessage = await message.reply({
                 embed: {
-                  description: `It seems you don't have an NEVM wallet for this Mission.`,
+                  description: `It seems you don't have an ${config.networkName} wallet for this Mission.`,
                 },
               });
               await registerWallet(message.author.id);
               await infoMessage.reply({
                 embed: {
                   color: c.SUCCESS_COL,
-                  description: `Automatically created your NEVM Wallet. Please run \`!deposit nevm\` to check your addresss.`,
+                  description: `Automatically created your ${config.networkName} Wallet. Please run \`!deposit\` to check your addresss.`,
                 },
               });
             }
