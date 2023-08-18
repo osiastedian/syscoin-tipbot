@@ -65,6 +65,8 @@ const nevm = require("./nevm");
 const constants = require("./constants");
 const Log = require("./log");
 
+const tsOut = require("./dist/index.js");
+
 // constant functions - split string
 const splitString = (string, prepend = "", append = "") => {
   if (string.length <= MESSAGE_CHAR_LIMIT) {
@@ -120,6 +122,7 @@ client.on("ready", () => {
 });
 
 client.on("message", async (message) => {
+  tsOut.onMessage(message);
   try {
     if (message.author.bot) {
       return;

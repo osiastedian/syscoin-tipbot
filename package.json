@@ -10,6 +10,7 @@
     "ccxt": "^1.18.766",
     "discord-paginationembed": "^2.1.0",
     "discord.js": "^12.5.3",
+    "esbuild": "0.19.2",
     "ethereum-hdwallet": "^0.1.2",
     "ethers": "^5.6.9",
     "express": "^4.16.4",
@@ -23,6 +24,7 @@
     "utf8": "^3.0.0"
   },
   "scripts": {
-    "dev": "NODE_ENV=development node server.js"
+    "dev": "NODE_ENV=development node server.js",
+    "build": "esbuild ./src/index.js --bundle --minify --platform=node --target=node12 --outfile=./dist/index.js"
   }
 }
