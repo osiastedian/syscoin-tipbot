@@ -26,7 +26,7 @@ export class TrackModule extends BaseModule {
     };
 
     const track = await TrackModel.create(trackData);
-    console.log("Track created:", track.toObject({ versionKey: false }));
+    this.log("Track created:", track.toObject({ versionKey: false }));
     return track.toObject({ versionKey: false });
   }
 }

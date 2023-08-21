@@ -1,3 +1,5 @@
+import { debug } from "../utils/log";
+
 export abstract class BaseModule {
   abstract name: string;
 
@@ -10,6 +12,6 @@ export abstract class BaseModule {
   }
 
   log(...args: any[]) {
-    console.log(`${this.getName()}: `, ...args);
+    debug(`${this.getName()}: `, ...args);
   }
 }
