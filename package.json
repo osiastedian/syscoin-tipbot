@@ -25,7 +25,7 @@
   },
   "scripts": {
     "dev": "NODE_ENV=development node server.js",
-    "build": "esbuild ./src/index.js --bundle --minify --platform=node --target=node12 --outfile=./dist/index.js"
+    "build": "esbuild ./src/index.js --bundle --minify --platform=node --target=node18 --outfile=./dist/index.js"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",

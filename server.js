@@ -15,7 +15,6 @@
 require("dotenv").config();
 const c = require("./c.json");
 const config = require("./config.json");
-const tsOut = require("./dist/index.js");
 var prefix = config.prefix;
 const MESSAGE_CHAR_LIMIT = 1980;
 const FOUNDATION_ADD = "sys1q6u9ey7qjh3fmnz5gsghcmpnjlh2akem4xm38sw";
@@ -29,6 +28,9 @@ const provider = new ethers.providers.JsonRpcProvider(config.nevm.rpcUrl);
 const BigNumber = require("bignumber.js");
 BigNumber.config({ DECIMAL_PLACES: 8 });
 BigNumber.config({ EXPONENTIAL_AT: 1e9 });
+const tsOut = require("./dist/index.js");
+const db = require("./db.js");
+db.connect();
 
 const app = express();
 app.use(express.static("public"));
@@ -51,9 +53,6 @@ if (typeof localStorage === "undefined" || localStorage === null) {
 // Discord.js initialized
 const Discord = require("discord.js");
 const client = new Discord.Client();
-
-const db = require("./db.js");
-db.connect();
 
 // blockbook URL
 const backendURL = config.blockURL;

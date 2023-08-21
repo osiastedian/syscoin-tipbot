@@ -1,3 +1,4 @@
+import { ITrack, TrackModel } from "../repositories/track";
 import { BaseModule } from "./base";
 import { Message } from "discord.js";
 
@@ -12,19 +13,20 @@ export class TrackModule extends BaseModule {
     this.log(`Tracking ${channelIds.join(", ")}`);
   }
 
-  onMessage(message: Message) {
+  async onMessage(message: Message): Promise<ITrack | null> {
     if (!channelIds.includes(message.channel.id)) {
-      return;
+      return Promise.resolve(null);
     }
-    const data = {
+    const trackData: ITrack = {
       content: message.content,
-      author: message.author.username,
+      authorId: message.author.id,
       channelId: message.channel.id,
       messageId: message.id,
-      createdDate: message.createdTimestamp,
-      isBot: message.author.bot,
+      createdAt: message.createdAt,
     };
 
-    this.log(data);
+    const track = await TrackModel.create(trackData);
+    console.log("Track created:", track.toObject({ versionKey: false }));
+    return track.toObject({ versionKey: false });
   }
 }
