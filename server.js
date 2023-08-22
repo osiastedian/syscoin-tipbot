@@ -12,6 +12,7 @@
  **/
 
 // variables
+require("dotenv").config();
 const c = require("./c.json");
 const config = require("./config.json");
 var prefix = config.prefix;
@@ -27,12 +28,17 @@ const provider = new ethers.providers.JsonRpcProvider(config.nevm.rpcUrl);
 const BigNumber = require("bignumber.js");
 BigNumber.config({ DECIMAL_PLACES: 8 });
 BigNumber.config({ EXPONENTIAL_AT: 1e9 });
+const tsOut = require("./dist/index.js");
+const db = require("./db.js");
+db.connect();
 
 const app = express();
 app.use(express.static("public"));
 app.get("/", function (request, response) {
   response.send("Running botserver");
 });
+
+tsOut.setUpControllers(app);
 
 const listener = app.listen(process.env.PORT, function () {
   console.log("Listening on port " + listener.address().port);
@@ -47,9 +53,6 @@ if (typeof localStorage === "undefined" || localStorage === null) {
 // Discord.js initialized
 const Discord = require("discord.js");
 const client = new Discord.Client();
-
-const db = require("./db.js");
-db.connect();
 
 // blockbook URL
 const backendURL = config.blockURL;
@@ -120,6 +123,7 @@ client.on("ready", () => {
 });
 
 client.on("message", async (message) => {
+  tsOut.onMessage(message);
   try {
     if (message.author.bot) {
       return;

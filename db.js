@@ -19,6 +19,7 @@ const Profile = require("./models/profile.js");
 const SPT = require("./models/spt.js");
 const Trade = require("./models/trade.js");
 const NevmWallet = require("./models/nevm-wallet");
+const Track = require("./dist/index")
 
 const mongodbhost = process.env.MONGODB_HOST ?? "mongodb://localhost";
 
