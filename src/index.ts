@@ -1,10 +1,17 @@
-import { Message } from "discord.js";
+import { Client, Message } from "discord.js";
 import { TrackModule } from "./modules/track";
 import { TrackController } from "./controllers/track-controller";
 import connectDb from "./repositories/utils/connect-db";
+import { Application } from "express";
+import { ChannelConfigurationController } from "./controllers/channel-configuration-controller";
+import { BaseModule } from "./modules/base";
 
 connectDb();
-const modules = [new TrackModule()];
+let modules: BaseModule[] = [];
+
+export const loadModules = (client: Client) => {
+  modules = [new TrackModule(client)];
+};
 
 export const onMessage = (message: Message) => {
   modules.forEach((module) =>
@@ -15,6 +22,9 @@ export const onMessage = (message: Message) => {
   );
 };
 
-export const setUpControllers = (app) => [new TrackController(app)];
+export const setUpControllers = (app: Application, client: Client) => [
+  new TrackController(app),
+  new ChannelConfigurationController(app, client),
+];
 
 export default onMessage;

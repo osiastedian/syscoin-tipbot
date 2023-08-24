@@ -1,3 +1,4 @@
+import { Message } from "discord.js";
 import { debug } from "../utils/log";
 
 export abstract class BaseModule {
@@ -14,4 +15,6 @@ export abstract class BaseModule {
   log(...args: any[]) {
     debug(`${this.getName()}: `, ...args);
   }
+
+  abstract onMessage(message: Message): Promise<any>;
 }

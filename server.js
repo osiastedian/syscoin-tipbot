@@ -38,8 +38,6 @@ app.get("/", function (request, response) {
   response.send("Running botserver");
 });
 
-tsOut.setUpControllers(app);
-
 const listener = app.listen(process.env.PORT, function () {
   console.log("Listening on port " + listener.address().port);
 });
@@ -112,6 +110,8 @@ process.on("SIGINT", function () {
 
 client.on("ready", () => {
   console.log("Up and running!");
+  tsOut.setUpControllers(app, client);
+  tsOut.loadModules(client);
 
   // set name if not properly set
   if (client.user.username !== config.botname) {
