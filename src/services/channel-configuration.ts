@@ -5,7 +5,7 @@ import ChannelConfigurationModel, {
 import { ApiError, NotFoundError } from "../utils/error";
 
 const TRACKING_MESSAGE =
-  "This channel is now being tracked by the bot for intended for improving quality of service.";
+  "This channel is now being tracked by the bot intended for improving quality of service.";
 const REMOVED_TRACKING_MESSAGE =
   "This channel is no longer being tracked by the bot.";
 
