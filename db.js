@@ -462,7 +462,14 @@ exports.createLog = function (discordID, action, targets, value) {
 };
 
 // creates a new giveaway in the db
-exports.createGiveaway = function (id, payout, currencyID, endTime) {
+exports.createGiveaway = function (
+  id,
+  payout,
+  currencyID,
+  endTime,
+  authorId,
+  expectedWinnerCount
+) {
   try {
     return Giveaway.create({
       giveawayID: id,
@@ -473,7 +480,24 @@ exports.createGiveaway = function (id, payout, currencyID, endTime) {
       dateCreated: new Date(),
       endTime: endTime,
       active: true,
+      authorId,
+      expectedWinnerCount,
     });
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+};
+
+exports.recordGiveawayMessage = function (id, messageId, channelId) {
+  try {
+    return Giveaway.findOneAndUpdate(
+      { giveawayID: id },
+      {
+        messageId: messageId,
+        channelId: channelId,
+      }
+    );
   } catch (error) {
     console.log(error);
     return null;
@@ -508,6 +532,20 @@ exports.endGiveaway = function (id) {
 exports.getGiveawayCount = function () {
   try {
     return Giveaway.countDocuments();
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+};
+
+exports.getActiveGiveaways = function () {
+  try {
+    return Giveaway.find({
+      active: true,
+      messageId: { $exists: true },
+      channelId: { $exists: true },
+      authorId: { $exists: true },
+    });
   } catch (error) {
     console.log(error);
     return null;

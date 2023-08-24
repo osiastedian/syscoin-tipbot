@@ -120,6 +120,10 @@ client.on("ready", () => {
 
   // set status
   client.user.setActivity(`#tips - !help `, { type: "PLAYING" });
+
+  // Resume giveaway timers
+  nevm.startGiveawayTimer();
+  nevm.resumeActiveGiveaways(client, provider);
 });
 
 client.on("message", async (message) => {
