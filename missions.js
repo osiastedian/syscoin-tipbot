@@ -1020,7 +1020,7 @@ const sendNotEnoughBalanceMessage = (message, mission) => {
  * @param {string[]} addressList
  * @param {ethers.ethers.BigNumber} amountPerReceiver
  * @param {ethers.ethers.BigNumber} value To be sent to contract
- * @param {ethers.ethers.providers.JsonRpcProvider} jsonProvider
+ * @param {ethers.providers.JsonRpcProvider} jsonRpc
  */
 const generateDistributeFundsTransaction = async (
   addressList,
@@ -1028,26 +1028,35 @@ const generateDistributeFundsTransaction = async (
   value,
   jsonRpc
 ) => {
+  const distributorContract = getDistributorContract(
+    config.nevm.distributor.address,
+    jsonRpc
+  );
+
+  const gasLimit = await distributorContract.estimateGas
+    .distribute(amountPerReceiver, addressList, { value })
+    .catch(() =>
+      Promise.resolve(
+        config.nevm.distributor.gasLimit +
+          addressList.length * config.nevm.distributor.additionalGasPerAddress
+      )
+    );
+
+  const gasPrice = await jsonRpc.getGasPrice();
+
+  // ethers.UnsignedTransaction
   const transactionConfig = {
     type: 2,
     chainId: config.nevm.chainId,
     value,
-    gasLimit:
-      config.nevm.distributor.gasLimit +
-      addressList.length * config.nevm.distributor.additionalGasPerAddress,
-    maxFeePerGas: ethers.utils.parseUnits(
-      config.nevm.distributor.missions.maxFeePerGasInGwei,
-      "gwei"
-    ),
+    gasLimit,
+    gasPrice,
+    maxFeePerGas: gasPrice,
     maxPriorityFeePerGas: ethers.utils.parseUnits(
       config.nevm.distributor.missions.maxPriorityFeePerGasInGwei,
       "gwei"
     ),
   };
-  const distributorContract = getDistributorContract(
-    config.nevm.distributor.address,
-    jsonRpc
-  );
 
   const distributeTransactionConfig =
     await distributorContract.populateTransaction.distribute(
@@ -1309,6 +1318,25 @@ exports.payMission = async function (
       return utxoPaymission(args, missionName, mission, message, client);
     }
 
+    const onMissionPayoutConfirmed = (txHash) => {
+      const explorerLink = utils.getNevmExplorerLink(
+        txHash,
+        "transaction",
+        "Click Here to View Transaction"
+      );
+      sendPayoutmessage(
+        client,
+        ethers.utils.formatEther(rewardInWei),
+        ethers.utils.formatEther(rewardDividedInWei),
+        mission.currencyID,
+        mission.missionID,
+        missionProfiles.map((profile) => profile.userID),
+        `\n\n${explorerLink}`
+      );
+
+      exports.archiveMission(args, message, client, true);
+    };
+
     const creatorWallet = await db.nevm.getNevmWallet(mission.creator);
 
     const rewardInWei = ethers.utils.parseUnits(mission.reward, "wei");
@@ -1329,6 +1357,29 @@ exports.payMission = async function (
     }
 
     const rewardDividedInWei = rewardInWei.div(missionProfiles.length);
+
+    if (mission.txHash) {
+      return new Promise((resolve) => {
+        console.log(
+          "PayMission: Waiting for mission payout to be mined ",
+          mission.missionID,
+          mission.txHash
+        );
+        const fetchReceipt = () => {
+          jsonRpc.getTransactionReceipt(mission.txHash).then((receipt) => {
+            if (receipt) {
+              resolve(receipt.transactionHash);
+            } else {
+              setTimeout(fetchReceipt, 10_000);
+            }
+          });
+        };
+
+        fetchReceipt();
+      }).then((txHash) => {
+        onMissionPayoutConfirmed(txHash);
+      });
+    }
 
     const minimumTipInWei = ethers.utils.parseEther(`${config.tipMin}`);
 
@@ -1360,13 +1411,14 @@ exports.payMission = async function (
       rewardInWei,
       jsonRpc
     )
-      .then((response) => {
+      .then(async (response) => {
         console.log(`Mission Payout sent for: ${mission.missionID}!`);
         const explorerLink = utils.getNevmExplorerLink(
           response.hash,
           "transaction",
           "Click Here to View Transaction"
         );
+        await db.setMissionTxHash(mission.missionID, response.hash);
         creatorUser.send({
           embed: {
             color: c.SUCCESS_COL,
@@ -1380,22 +1432,7 @@ exports.payMission = async function (
         return response.wait(1);
       })
       .then((receipt) => {
-        const explorerLink = utils.getNevmExplorerLink(
-          receipt.transactionHash,
-          "transaction",
-          "Click Here to View Transaction"
-        );
-        sendPayoutmessage(
-          client,
-          ethers.utils.formatEther(rewardInWei),
-          ethers.utils.formatEther(rewardDividedInWei),
-          mission.currencyID,
-          mission.missionID,
-          missionProfiles.map((profile) => profile.userID),
-          `\n\n${explorerLink}`
-        );
-
-        exports.archiveMission(args, message, client, true);
+        onMissionPayoutConfirmed(receipt.transactionHash);
       });
 
     if (mission.suggesterID) {
