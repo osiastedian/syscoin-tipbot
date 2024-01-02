@@ -82,13 +82,7 @@ var exports = (module.exports = function (client) {
           )[0][1];
 
           console.log("paying mission " + missionID);
-          missionsJS.payMission(
-            [mission.missionID],
-            message,
-            client,
-            true,
-            provider
-          );
+          missionsJS.payMission([mission.missionID], message, client, true);
           clearInterval(intervals[missionID]);
         }
       }

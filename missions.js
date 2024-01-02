@@ -11,7 +11,6 @@ var prefix = config.prefix;
 
 const db = require("./db.js");
 const utils = require("./utils.js");
-const tips = require("./tips.js");
 const ethers = require("ethers");
 const {
   getDistributorContract,
@@ -69,10 +68,12 @@ exports.createOrEditMission = async function (args, message, client, edit) {
       return;
     }
 
-    let [missionName, payout, currency, timeArg] = args;
+    let [missionName, payout, currency, timeArg, networkName = "nevm"] = args;
 
     var gCurrency, currencyStr;
     var decimals = 8;
+
+    const networkConfig = config[networkName];
 
     // set up currency strings and get decimals for converting
     // between whole and sats later
@@ -80,7 +81,7 @@ exports.createOrEditMission = async function (args, message, client, edit) {
       gCurrency = currency.toUpperCase();
 
       if (gCurrency !== "SYS") {
-        const supportedToken = config.nevm.supportedTokens.find(
+        const supportedToken = networkConfig.supportedTokens.find(
           (token) => token.symbol === gCurrency
         );
         if (!supportedToken) {
@@ -265,7 +266,8 @@ exports.createOrEditMission = async function (args, message, client, edit) {
         gCurrency,
         endDate,
         suggesterID,
-        suggestValue
+        suggestValue,
+        networkName
       );
 
       if (suggesterID !== null) {
@@ -286,13 +288,6 @@ exports.createOrEditMission = async function (args, message, client, edit) {
         }
       }
     } else {
-      const existingMission = await db.getMission(missionName);
-      if (!existingMission.nevm) {
-        value = utils.toSats(payoutBig, decimals);
-        if (suggester) {
-          suggestValue = utils.toSats(suggesterPayout, decimals);
-        }
-      }
       missionNew = await db.editMission(
         missionName,
         value,
@@ -353,27 +348,25 @@ exports.listMissions = async function (args, message, client) {
     }
 
     let activeMissions = await db.getAllActiveMissions();
-    let utxoList = "UTXO:\n";
-    let nevmList = "NEVM:\n";
-    for (i = 0; i < activeMissions.length; i++) {
-      const activeMission = activeMissions[i];
-      const remainingTime = utils.getTimeDiffStr(activeMissions[i].endTime);
-      const line = ` ***${activeMission.missionID}***: ends in ${remainingTime}\n`;
-      if (activeMission.nevm) {
-        nevmList += line;
-      } else {
-        utxoList += line;
-      }
 
-      if (utxoList === "UTXO:\n") {
-        utxoList += "-- EMPTY --";
-      }
-    }
+    let missionMessageList = "";
+
+    config.evmNetworks.forEach((networkName) => {
+      missionMessageList += `\n${networkName.toUpperCase()}:\n`;
+
+      activeMissions.forEach((activeMission) => {
+        if ((activeMission.networkName || "nevm") === networkName) {
+          const remainingTime = utils.getTimeDiffStr(activeMission.endTime);
+          const line = ` ***${activeMission.missionID}***: ends in ${remainingTime}\n`;
+          missionMessageList += line;
+        }
+      });
+    });
 
     message.channel.send({
       embed: {
         color: c.SUCCESS_COL,
-        description: `Here are the active missions: \n ${nevmList} \n ${utxoList}`,
+        description: `Here are the active missions: \n ${missionMessageList}`,
       },
     });
   } catch (error) {
@@ -649,7 +642,7 @@ exports.printMissionDetails = async function (args, message, client) {
       });
       return;
     }
-    var mission = await db.getMission(missionName);
+    const mission = await db.getMission(missionName);
 
     if (!mission) {
       message.channel.send({
@@ -664,37 +657,21 @@ exports.printMissionDetails = async function (args, message, client) {
 
     // set up currency string and get the decimals for converting between
     // wholeUnit and sats later on
-    let token, decimals, currencyStr;
+    let token,
+      decimals,
+      currencyStr = "SYS";
+    const networkConfig = config[mission.networkName];
     if (mission.currencyID !== "SYS") {
-      if (mission.nevm) {
-        token = config.nevm.supportedTokens.find(
-          (token) => token.symbol === mission.currencyID
-        );
+      token = networkConfig.supportedTokens.find(
+        (token) => token.symbol === mission.currencyID
+      );
+      if (token) {
         currencyStr = token.symbol;
-      } else {
-        try {
-          token = await utils.getSPT(mission.currencyID);
-          currencyStr = await utils.getExpLink(mission.currencyID, c.TOKEN);
-        } catch (error) {
-          console.log(`Error finding currency ${mission.currencyID}`);
-          message.channel.send({
-            embed: {
-              color: c.FAIL_COL,
-              description: "Error finding the currency for the mission payout.",
-            },
-          });
-          return;
-        }
+        decimals = token.decimals;
       }
-      decimals = token.decimals;
-    } else {
-      currencyStr = config.ctick;
-      decimals = 8;
     }
 
-    const payoutWhole = mission.nevm
-      ? ethers.utils.formatEther(mission.reward)
-      : utils.toWholeUnit(new BigNumber(mission.reward), decimals);
+    const payoutWhole = ethers.utils.formatEther(mission.reward);
 
     var missionProfiles = await db.getMissionProfiles(missionName);
     var txtUsers = "";
@@ -747,223 +724,6 @@ exports.printMissionDetails = async function (args, message, client) {
       embed: { color: c.FAIL_COL, description: "Error listing missions." },
     });
   }
-};
-
-const utxoPaymission = async (args, missionName, mission, message, client) => {
-  var myProfile = await db.getProfile(mission.creator);
-  var myBalance = await db.getBalance(mission.creator, mission.currencyID);
-  var missionTotalReward = new BigNumber(mission.reward);
-  if (mission.suggesterPayout) {
-    missionTotalReward = missionTotalReward.plus(mission.suggesterPayout);
-  }
-  // make sure mission payer has the funds to pay all the users
-  if (!utils.hasEnoughBalance(myBalance, missionTotalReward.toString())) {
-    message.channel.send({
-      embed: {
-        color: c.FAIL_COL,
-        description: `Sorry, you don't have enough funds to pay the mission: ${mission.missionID}!`,
-      },
-    });
-    return;
-  }
-
-  // remove mission creator if they're in there (naughty)
-  var missionReward = new BigNumber(mission.reward);
-  var missionProfiles = await db.getMissionProfiles(missionName);
-  for (var i = 0; i < missionProfiles.length; i++) {
-    if (missionProfiles[i].userID === message.author.id) {
-      missionProfiles.splice(i, 1);
-      break;
-    }
-  }
-
-  if (!missionProfiles.length > 0) {
-    message.channel.send({
-      embed: {
-        color: c.FAIL_COL,
-        description: "Nobody took part in the mission, there's nobody to pay!",
-      },
-    });
-    exports.archiveMission([mission.missionID], message, client, true);
-    return;
-  }
-
-  var txtUsers = "";
-  var token, decimals, currencyStr, tipStr;
-  if (mission.currencyID !== "SYS") {
-    try {
-      token = await utils.getSPT(mission.currencyID);
-      tipStr = token.assetGuid;
-      currencyStr = await utils.getExpLink(mission.currencyID, c.TOKEN);
-    } catch (error) {
-      console.log(`Error finding currency ${mission.currencyID}`);
-      message.channel.send({
-        embed: {
-          color: c.FAIL_COL,
-          description: "Error finding the currency for the mission payout.",
-        },
-      });
-      return;
-    }
-
-    decimals = token.decimals;
-  } else {
-    tipStr = config.ctick;
-    currencyStr = config.ctick;
-    decimals = 8;
-  }
-  var dividedReward = missionReward.dividedBy(missionProfiles.length);
-
-  // make sure reward can't have more decimals than is possible or allowed
-  // on the tipbot
-  var dividedRewardWhole = utils.toWholeUnit(dividedReward, decimals);
-  var decimalCount = utils.decimalCount(dividedRewardWhole.toString());
-  if (decimalCount > decimals) {
-    dividedRewardWhole = new BigNumber(dividedRewardWhole.toFixed(decimals, 1));
-  }
-  if (decimalCount > config.tipMaxDecimals) {
-    dividedRewardWhole = new BigNumber(
-      dividedRewardWhole.toFixed(config.tipMaxDecimals, 1)
-    );
-  }
-
-  if (dividedRewardWhole.lt(config.tipMin)) {
-    message.channel.send({
-      embed: {
-        color: c.FAIL_COL,
-        description:
-          "The mission payout per participant is below the minimum tip amount on the tipbot.",
-      },
-    });
-    return;
-  }
-
-  var tipPerParticipant = new BigNumber(
-    utils.toSats(dividedRewardWhole, decimals)
-  );
-
-  //Verify the validity of the payout argument.
-  if (tipPerParticipant.isNaN() || tipPerParticipant.lte(0)) {
-    message.channel.send({
-      embed: {
-        color: c.FAIL_COL,
-        description:
-          "The amount that each participant will receive is below the threshold for this asset.",
-      },
-    });
-    return;
-  }
-
-  let tipSuccess;
-  var totalTip = new BigNumber(0);
-  let targets = [];
-  var tipInfo = [1, dividedRewardWhole, tipStr];
-  for (var i = 0; i < missionProfiles.length; i++) {
-    tipSuccess = await tips.tipUser(
-      tipInfo,
-      myProfile,
-      missionProfiles[i],
-      c.MISSION,
-      client,
-      null
-    );
-
-    // if tip is successful add user to the list of targets for logging,
-    // and for printing to the channel
-    if (tipSuccess) {
-      targets.push(missionProfiles[i].userID);
-      txtUsers += "<@" + missionProfiles[i].userID + "> ";
-      totalTip = totalTip.plus(tipPerParticipant);
-    }
-  }
-  var totalTipWhole = utils.toWholeUnit(totalTip, decimals);
-
-  // pay the suggester their payout
-  var suggesterPayout = null;
-  var suggesterPayoutWhole;
-  var suggesterStr = "";
-  if (mission.suggesterID) {
-    var suggesterProfile = await db.getProfile(mission.suggesterID);
-    if (suggesterProfile) {
-      suggesterPayout = new BigNumber(mission.suggesterPayout);
-      suggesterPayoutWhole = utils.toWholeUnit(suggesterPayout, decimals);
-      var suggesterTipInfo = [1, suggesterPayoutWhole, tipStr];
-      tipSuccess = await tips.tipUser(
-        suggesterTipInfo,
-        myProfile,
-        suggesterProfile,
-        c.MISSION,
-        client,
-        null
-      );
-
-      if (tipSuccess) {
-        suggesterStr = `Good suggestion! <@${mission.suggesterID}> has been paid ${suggesterPayoutWhole} ${currencyStr} for suggesting the mission!`;
-      } else {
-        message.channel.send({
-          embed: {
-            color: c.FAIL_COL,
-            description: `Sending failed! You couldn't pay the suggester!`,
-          },
-        });
-      }
-    }
-  }
-
-  if (targets.length > 0) {
-    if (tipInfo[2] == undefined) {
-      tipInfo[2] = "SYS";
-    } else {
-      tipInfo[2] = tipInfo[2].toUpperCase();
-    }
-    var actionStr = `Paid ${missionName}: ${
-      tipInfo[1]
-    } ${currencyStr} per user | Total paid: ${totalTip.toString()}`;
-    let log = await db.createLog(
-      message.author.id,
-      actionStr,
-      targets,
-      totalTip.toString()
-    );
-  }
-
-  //split into groups of 50 users for discord limit
-  var users = txtUsers.split(" ");
-  var splitUsers = arraySplit(users, 50);
-  splitUsers.forEach((arr) => {
-    var line = "\n\n";
-    arr.forEach((user) => {
-      line = line + user + "\n ";
-    });
-    var payoutChannel = client.channels.cache.get(config.missionPayOutsChannel);
-    payoutChannel.send({
-      embed: {
-        color: c.SUCCESS_COL,
-        description:
-          ":fireworks: :moneybag: Paid **" +
-          dividedRewardWhole.toString() +
-          " " +
-          currencyStr +
-          "** to " +
-          targets.length +
-          " users (Total = " +
-          totalTipWhole.toString() +
-          " " +
-          currencyStr +
-          ") in mission **" +
-          missionName +
-          "** listed below:" +
-          line,
-      },
-    });
-    if (mission.suggesterID && suggesterStr.length > 0) {
-      payoutChannel.send({
-        embed: { color: c.SUCCESS_COL, description: suggesterStr },
-      });
-    }
-  });
-
-  exports.archiveMission(args, message, client, true);
 };
 
 /**
@@ -1034,10 +794,11 @@ const generateDistributeFundsTransaction = async (
   addressList,
   amountPerReceiver,
   value,
-  jsonRpc
+  networkConfig
 ) => {
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
   const distributorContract = getDistributorContract(
-    config.nevm.distributor.address,
+    networkConfig.distributor.address,
     jsonRpc
   );
 
@@ -1045,8 +806,8 @@ const generateDistributeFundsTransaction = async (
     .distribute(amountPerReceiver, addressList, { value })
     .catch(() =>
       Promise.resolve(
-        config.nevm.distributor.gasLimit +
-          addressList.length * config.nevm.distributor.additionalGasPerAddress
+        networkConfig.distributor.gasLimit +
+          addressList.length * networkConfig.distributor.additionalGasPerAddress
       )
     );
 
@@ -1056,7 +817,7 @@ const generateDistributeFundsTransaction = async (
   // ethers.UnsignedTransaction
   const transactionConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
+    chainId: networkConfig.chainId,
     value,
     gasLimit,
     gasPrice: maxFeePerGas ?? gasPrice,
@@ -1064,7 +825,7 @@ const generateDistributeFundsTransaction = async (
     maxPriorityFeePerGas:
       maxPriorityFeePerGas ??
       ethers.utils.parseUnits(
-        config.nevm.distributor.missions.maxPriorityFeePerGasInGwei,
+        networkConfig.distributor.missions.maxPriorityFeePerGasInGwei,
         "gwei"
       ),
   };
@@ -1087,19 +848,20 @@ const generateSetTokenAllownce = async (
   creatorAddress,
   tokenAddress,
   amount,
-  jsonRpc
+  networkConfig
 ) => {
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
   const transactionConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
-    gasLimit: config.nevm.tokenApproveGasLimit,
+    chainId: networkConfig.chainId,
+    gasLimit: networkConfig.tokenApproveGasLimit,
     maxFeePerGas: ethers.utils.parseUnits("2.56", "gwei"),
     maxPriorityFeePerGas: ethers.utils.parseUnits("2.5", "gwei"),
   };
   const tokenContract = await getErc20Contract(tokenAddress, jsonRpc);
   const approveTransactionConfig =
     await tokenContract.populateTransaction.approve(
-      config.nevm.distributor.address,
+      networkConfig.distributor.address,
       amount
     );
 
@@ -1111,25 +873,26 @@ const generateDistributeTokensTransaction = async (
   addressList,
   amountPerReceiver,
   tokenAddress,
-  jsonRpc
+  networkConfig
 ) => {
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
   const transactionConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
+    chainId: networkConfig.chainId,
     gasLimit:
-      config.nevm.distributor.gasLimit +
-      addressList.length * config.nevm.tokenGasLimit,
+      networkConfig.distributor.gasLimit +
+      addressList.length * networkConfig.tokenGasLimit,
     maxFeePerGas: ethers.utils.parseUnits(
-      config.nevm.distributor.missions.maxFeePerGasInGwei,
+      networkConfig.distributor.missions.maxFeePerGasInGwei,
       "gwei"
     ),
     maxPriorityFeePerGas: ethers.utils.parseUnits(
-      config.nevm.distributor.missions.maxPriorityFeePerGasInGwei,
+      networkConfig.distributor.missions.maxPriorityFeePerGasInGwei,
       "gwei"
     ),
   };
   const distributorContract = getDistributorContract(
-    config.nevm.distributor.address,
+    networkConfig.distributor.address,
     jsonRpc
   );
 
@@ -1229,9 +992,10 @@ const sendPayoutTransactions = async (
   addressList,
   rewardDividedInWei,
   rewardInWei,
-  jsonRpc
+  networkConfig
 ) => {
-  const supportedToken = config.nevm.supportedTokens.find(
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+  const supportedToken = networkConfig.supportedTokens.find(
     (token) => token.symbol === symbol
   );
   if (supportedToken) {
@@ -1239,7 +1003,7 @@ const sendPayoutTransactions = async (
       ownerAddress,
       supportedToken.address,
       rewardInWei,
-      jsonRpc
+      networkConfig
     );
     const approvalReceipt = await runTransaction(
       privateKey,
@@ -1254,7 +1018,7 @@ const sendPayoutTransactions = async (
         addressList,
         rewardDividedInWei,
         supportedToken.address,
-        jsonRpc
+        networkConfig
       );
     return runTransaction(privateKey, distributTokensTransaction, jsonRpc);
   }
@@ -1263,7 +1027,7 @@ const sendPayoutTransactions = async (
     addressList,
     rewardDividedInWei,
     rewardInWei,
-    jsonRpc
+    networkConfig
   );
 
   return runTransaction(privateKey, distributeTransactionConfig, jsonRpc);
@@ -1279,16 +1043,9 @@ const sendPayoutTransactions = async (
  * @param {Discord.Message} message
  * @param {Discord.Client} client
  * @param {boolean} automated
- * @param {ethers.ethers.providers.JsonRpcProvider} jsonRpc
  * @returns
  */
-exports.payMission = async function (
-  args,
-  message,
-  client,
-  automated,
-  jsonRpc
-) {
+exports.payMission = async function (args, message, client, automated) {
   try {
     if (!automated) {
       if (!utils.checkMissionRole(message)) {
@@ -1325,15 +1082,12 @@ exports.payMission = async function (
       return;
     }
 
-    if (!mission.nevm) {
-      return utxoPaymission(args, missionName, mission, message, client);
-    }
-
     const onMissionPayoutConfirmed = (txHash) => {
       const explorerLink = utils.getNevmExplorerLink(
         txHash,
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        mission.networkName
       );
       sendPayoutmessage(
         client,
@@ -1351,6 +1105,10 @@ exports.payMission = async function (
     const creatorWallet = await db.nevm.getNevmWallet(mission.creator);
 
     const rewardInWei = ethers.utils.parseUnits(mission.reward, "wei");
+
+    const networkName = mission.networkName ?? "nevm";
+    const networkConfig = config[networkName];
+    const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
 
     const balanceInWei = await jsonRpc.getBalance(creatorWallet.address);
 
@@ -1420,14 +1178,15 @@ exports.payMission = async function (
       addressList,
       rewardDividedInWei,
       rewardInWei,
-      jsonRpc
+      networkConfig
     )
       .then(async (response) => {
         console.log(`Mission Payout sent for: ${mission.missionID}!`);
         const explorerLink = utils.getNevmExplorerLink(
           response.hash,
           "transaction",
-          "Click Here to View Transaction"
+          "Click Here to View Transaction",
+          networkName
         );
         await db.setMissionTxHash(mission.missionID, response.hash);
         creatorUser.send({
@@ -1469,7 +1228,8 @@ exports.payMission = async function (
           const explorerLink = utils.getNevmExplorerLink(
             response.hash,
             "transaction",
-            "Click Here to View Transaction"
+            "Click Here to View Transaction",
+            networkName
           );
           creatorUser.send({
             embed: {
@@ -1488,7 +1248,8 @@ exports.payMission = async function (
           const explorerLink = utils.getNevmExplorerLink(
             receipt.transactionHash,
             "transaction",
-            "Click Here to View Transaction"
+            "Click Here to View Transaction",
+            networkName
           );
           sendSuggesterPayoutSuccessMessage(
             client,
@@ -1619,28 +1380,24 @@ exports.reportSubmit = async (message) => {
     if (mission) {
       if (mission.active) {
         try {
-          if (mission.nevm) {
-            const wallet = await db.nevm.getNevmWallet(message.author.id);
-            if (!wallet) {
-              const infoMessage = await message.reply({
-                embed: {
-                  description: `It seems you don't have an NEVM wallet for this Mission.`,
-                },
-              });
-              await registerWallet(message.author.id);
-              await infoMessage.reply({
-                embed: {
-                  color: c.SUCCESS_COL,
-                  description: `Automatically created your NEVM Wallet. Please run \`!deposit nevm\` to check your addresss.`,
-                },
-              });
-            }
+          const wallet = await db.nevm.getNevmWallet(message.author.id);
+          if (!wallet) {
+            const infoMessage = await message.reply({
+              embed: {
+                description: `It seems you don't have an NEVM wallet for this Mission.`,
+              },
+            });
+            await registerWallet(message.author.id);
+            await infoMessage.reply({
+              embed: {
+                color: c.SUCCESS_COL,
+                description: `Automatically created your NEVM Wallet. Please run \`!deposit nevm\` to check your addresss.`,
+              },
+            });
           }
 
-          let missionUpdated = await db.addProfileToMission(
-            message.author.id,
-            missionName[0]
-          );
+          await db.addProfileToMission(message.author.id, missionName[0]);
+
           utils.isSuccessMsgReact(true, message);
           console.log(`Added ${message.author.id} to mission ${missionName}`);
         } catch (error) {

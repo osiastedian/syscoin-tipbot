@@ -221,7 +221,8 @@ exports.createMission = function (
   currency,
   endDate,
   suggesterID,
-  suggesterPayout
+  suggesterPayout,
+  networkName
 ) {
   try {
     let data = {
@@ -234,6 +235,7 @@ exports.createMission = function (
       endTime: endDate,
       active: true,
       nevm: true,
+      networkName
     };
     if (suggesterID && suggesterPayout) {
       data = {

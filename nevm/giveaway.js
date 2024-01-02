@@ -507,9 +507,8 @@ async function createGiveAway(message, args, client) {
  * Run giveaway thread for a giveaway
  * @param {*} giveaway
  * @param {Discord.Client} client
- * @param {ethers.providers.JsonRpcProvider} jsonProvider
  */
-const runGiveaway = async (giveaway, client, jsonProvider) => {
+const runGiveaway = async (giveaway, client) => {
   const {
     giveawayID,
     messageId,
@@ -532,22 +531,18 @@ const runGiveaway = async (giveaway, client, jsonProvider) => {
     giveawayMessage,
     giveaway.giveawayID,
     timeDuration,
-    winnerCount,
-    jsonProvider
+    winnerCount
   );
 };
 
 /**
  *
  * @param {Discord.Client} client
- * @param {ethers.providers.JsonRpcProvider} jsonProvider
  */
-async function resumeActiveGiveaways(client, jsonProvider) {
+async function resumeActiveGiveaways(client) {
   const activeGiveaways = await db.getActiveGiveaways();
   await Promise.all(
-    activeGiveaways.map(async (giveaway) =>
-      runGiveaway(giveaway, client, jsonProvider)
-    )
+    activeGiveaways.map(async (giveaway) => runGiveaway(giveaway, client))
   );
 }
 

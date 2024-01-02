@@ -14,6 +14,7 @@ const MissionSchema = new mongoose.Schema({
   active: { type: Boolean },
   nevm: { type: Boolean },
   txHash: { type: String },
+  networkName: { type: String },
 });
 
 Mission = mongoose.model("missions", MissionSchema);

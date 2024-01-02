@@ -27,10 +27,6 @@ const axios = require("axios");
 const HDWallet = require("ethereum-hdwallet");
 const ethers = require("ethers");
 
-const provider = new ethers.providers.JsonRpcProvider(config.nevm.rpcUrl);
-
-const signer = provider.getSigner();
-
 const BigNumber = require("bignumber.js");
 BigNumber.config({ DECIMAL_PLACES: 8 });
 BigNumber.config({ EXPONENTIAL_AT: 1e9 });
@@ -143,7 +139,7 @@ client.on("ready", () => {
 
   // Resume giveaway timers
   nevm.startGiveawayTimer();
-  nevm.resumeActiveGiveaways(client, provider);
+  nevm.resumeActiveGiveaways(client);
 });
 
 const checkHouseProfile = async () => {
@@ -866,7 +862,7 @@ client.on("message", async (message) => {
       case "paymission":
         // pay mission
         if (message.channel.id == config.missionChannel) {
-          missions.payMission(args, message, client, false, provider);
+          missions.payMission(args, message, client, false);
         }
         break;
 
@@ -1425,7 +1421,7 @@ client.on("message", async (message) => {
         const [duration, winnerCount, amount, network] = args;
 
         if (config.evmNetworks.includes(network.toLowerCase())) {
-          return await nevm.createGiveAway(message, args, client, provider);
+          return await nevm.createGiveAway(message, args, client);
         }
 
         if (
