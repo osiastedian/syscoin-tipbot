@@ -12,10 +12,16 @@ setInterval(() => {
     return;
   }
   isProcessingTransaction = true;
-  const { privateKey, transactionConfig, jsonRpc, onFinish, onReject } =
-    transactionQueue.pop();
+  const {
+    privateKey,
+    transactionConfig,
+    jsonRpc,
+    onFinish,
+    onReject,
+    network,
+  } = transactionQueue.pop();
 
-  sendTransaction(privateKey, transactionConfig, jsonRpc)
+  sendTransaction(privateKey, transactionConfig, jsonRpc, network)
     .then((...args) => {
       isProcessingTransaction = false;
       onFinish(...args);
@@ -31,8 +37,14 @@ setInterval(() => {
  * @param {string} privateKey
  * @param {ethers.ethers.PopulatedTransaction} transactionConfig
  * @param {ethers.ethers.providers.JsonRpcProvider} jsonRpc
+ * @param {string} network
  */
-const runTransaction = (privateKey, transactionConfig, jsonRpc) => {
+const runTransaction = (
+  privateKey,
+  transactionConfig,
+  jsonRpc,
+  network = "nevm"
+) => {
   return new Promise((resolve, reject) => {
     transactionQueue.push({
       privateKey,
@@ -40,6 +52,7 @@ const runTransaction = (privateKey, transactionConfig, jsonRpc) => {
       jsonRpc,
       onFinish: resolve,
       onReject: reject,
+      network,
     });
   });
 };
@@ -50,9 +63,14 @@ const runTransaction = (privateKey, transactionConfig, jsonRpc) => {
  * @param {ethers.ethers.PopulatedTransaction} transactionConfig
  * @param {ethers.ethers.providers.JsonRpcProvider} jsonRpc
  */
-const sendTransaction = async (privateKey, transactionConfig, jsonRpc) => {
+const sendTransaction = async (
+  privateKey,
+  transactionConfig,
+  jsonRpc,
+  networkPrefix = ""
+) => {
   const wallet = new ethers.Wallet(privateKey, jsonRpc);
-  const nonce = await getLatestNonce(wallet.address, jsonRpc);
+  const nonce = await getLatestNonce(wallet.address, jsonRpc, networkPrefix);
   const configWithNonce = {
     ...transactionConfig,
     nonce,

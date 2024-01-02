@@ -112,7 +112,9 @@ const checkWinnersArg = (message, winners) => {
 };
 
 const checkCurrencyArg = (message, currency) => {
-  const isCurrencyArgCorrect = currency.toUpperCase().match(/NEVM|SYS/);
+  const isCurrencyArgCorrect = [...config.evmNetworks, "sys"].includes(
+    currency.toLowerCase()
+  );
   if (!isCurrencyArgCorrect) {
     message.channel.send({
       embed: {
@@ -245,10 +247,14 @@ const postCreation = async (
   giveawayMessage,
   giveawayID,
   collectorDurationInMs,
-  expectedWinnersCount,
-  jsonProvider
+  expectedWinnersCount
 ) => {
   const giveaway = await db.getGiveaway(giveawayID);
+  const networkName = giveaway.networkName?.toLowerCase() ?? "nevm";
+  const networkConfig = config[networkName];
+  const jsonProvider = new ethers.providers.JsonRpcProvider(
+    networkConfig.rpcUrl
+  );
   const { endTime, reward } = giveaway;
   const filter = (reaction, user) => {
     return reaction.emoji.name === REACT_EMOJI && !user.bot;
@@ -344,6 +350,7 @@ const postCreation = async (
       winnerAddresses,
       reward,
       total.toString(),
+      networkConfig,
       jsonProvider
     );
 
@@ -355,7 +362,8 @@ const postCreation = async (
         const explorerLink = utils.getNevmExplorerLink(
           response.hash,
           "transaction",
-          "Click Here to View Transaction"
+          "Click Here to View Transaction",
+          networkName
         );
         createEndMessage(giveawayMessage, finalWinners, explorerLink);
         return response.wait(1);
@@ -365,7 +373,8 @@ const postCreation = async (
         const explorerLink = utils.getNevmExplorerLink(
           receipt.transactionHash,
           "transaction",
-          "Transaction Confirmed.\nClick Here to View Transaction"
+          "Transaction Confirmed.\nClick Here to View Transaction",
+          networkName
         );
         createEndMessage(giveawayMessage, finalWinners, explorerLink);
       });
@@ -396,9 +405,8 @@ const postCreation = async (
  * @param {Discord.Message} message
  * @param {string[]} args
  * @param {Discord.Client} client
- * @param {ethers.providers.JsonRpcProvider} jsonProvider
  */
-async function createGiveAway(message, args, client, jsonProvider) {
+async function createGiveAway(message, args, client) {
   message.channel.messages;
   if (
     !checkRole(message) ||
@@ -408,13 +416,13 @@ async function createGiveAway(message, args, client, jsonProvider) {
     return;
   }
 
-  const [time, winners, amount, currency] = args;
+  const [time, winners, amount, networkName] = args;
 
   // check if time is using the correct format: 10s or 10m
   if (
     !checkTimeArg(message, time) ||
     !checkWinnersArg(message, winners) ||
-    !checkCurrencyArg(message, currency) ||
+    !checkCurrencyArg(message, networkName) ||
     !checkAmountArg(message, amount)
   ) {
     return;
@@ -435,6 +443,10 @@ async function createGiveAway(message, args, client, jsonProvider) {
   const userId = message.author.id;
   const wallet = await db.nevm.getNevmWallet(userId);
 
+  const networkConfig = config[networkName.toLowerCase()];
+  const jsonProvider = new ethers.providers.JsonRpcProvider(
+    networkConfig.rpcUrl
+  );
   const balance = await jsonProvider.getBalance(wallet.address);
 
   //    check if balance is greater or equal winnerCount * amountInWei
@@ -457,7 +469,8 @@ async function createGiveAway(message, args, client, jsonProvider) {
     "SYS",
     timeExpire,
     message.author.id,
-    winnerCount
+    winnerCount,
+    networkName
   );
 
   // create message for giveaway

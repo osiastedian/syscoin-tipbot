@@ -38,35 +38,35 @@ const generateSendTransactionConfig = async (
   receiverWallet,
   symbol,
   value,
-  jsonRpc
+  jsonRpc,
+  networkConfig
 ) => {
   const partialConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
+    chainId: networkConfig.chainId,
     to: receiverWallet.address,
     value,
   };
 
   const gasLimit = await jsonRpc
     .estimateGas(partialConfig)
-    .catch(() => Promise.resolve(config.nevm.gasLimit));
+    .catch(() => Promise.resolve(networkConfig.gasLimit));
 
   const { maxPriorityFeePerGas, maxFeePerGas } = await jsonRpc.getFeeData();
 
   let transactionConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
+    chainId: networkConfig.chainId,
     to: receiverWallet.address,
     value,
     gasLimit,
     maxFeePerGas: maxFeePerGas ?? parseUnits("40", "gwei"),
-    maxPriorityFeePerGas:
-      maxPriorityFeePerGas?.mul("2") ?? parseUnits("3", "gwei"),
+    maxPriorityFeePerGas: maxPriorityFeePerGas ?? parseUnits("3", "gwei"),
   };
 
   if (symbol && symbol.toUpperCase() !== "SYS") {
     const tokenSymbol = symbol;
-    const token = config.nevm.supportedTokens.find(
+    const token = networkConfig.supportedTokens.find(
       (token) => token.symbol === tokenSymbol.toUpperCase()
     );
     if (!token) {
@@ -92,7 +92,7 @@ const generateSendTransactionConfig = async (
     transactionConfig = {
       ...transactionConfig,
       value: 0,
-      gasLimit: config.nevm.tokenGasLimit,
+      gasLimit: networkConfig.tokenGasLimit,
       ...transferTransactionConfig,
     };
   }
@@ -107,21 +107,13 @@ const generateSendTransactionConfig = async (
  * @param {string[]} args Command arguments
  * @param {Profile} senderProfile Tipbot Profile
  * @param {Profile} receiverProfile Tipbot Profile
- * @param {ethers.providers.JsonRpcProvider} jsonRpc Ethers JSON PRC Provider
  */
-async function send(
-  client,
-  message,
-  args,
-  senderProfile,
-  receiverProfile,
-  jsonRpc
-) {
+async function send(client, message, args, senderProfile, receiverProfile) {
   if (args.length < 2 || !senderProfile || !receiverProfile) {
     return sendUsageExample(message);
   }
 
-  const [argUser, argValue, argNevm, argSymbol] = args;
+  const [argUser, argValue, argNetwork, argSymbol] = args;
 
   const senderWallet = await db.nevm.getNevmWallet(senderProfile.userID);
   const receiverWallet = await db.nevm.getNevmWallet(receiverProfile.userID);
@@ -153,7 +145,11 @@ async function send(
       });
   }
 
-  const gasLimit = config.nevm.gasLimit;
+  const networkName = argNetwork.toLowerCase();
+
+  const networkConfig = config[networkName];
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+  const gasLimit = networkConfig.gasLimit;
 
   const maxFeePerGas = await jsonRpc
     .getGasPrice()
@@ -199,7 +195,8 @@ async function send(
       receiverWallet,
       argSymbol,
       value,
-      jsonRpc
+      jsonRpc,
+      networkConfig
     );
   } catch (e) {
     message.channel.send({
@@ -219,7 +216,8 @@ async function send(
       const explorerLink = utils.getNevmExplorerLink(
         response.hash,
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        networkName
       );
       sendUser.send({
         embed: {
@@ -243,7 +241,8 @@ async function send(
       const explorerLink = utils.getNevmExplorerLink(
         receipt.transactionHash,
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        networkName
       );
       sendUser.send({
         embed: {
@@ -283,7 +282,8 @@ async function send(
       const explorerLink = utils.getNevmExplorerLink(
         "receipt.transactionHash",
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        networkName
       );
       sendUser.send({
         embed: {

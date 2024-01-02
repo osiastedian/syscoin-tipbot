@@ -481,7 +481,8 @@ exports.createGiveaway = function (
   currencyID,
   endTime,
   authorId,
-  expectedWinnerCount
+  expectedWinnerCount,
+  networkName
 ) {
   try {
     return Giveaway.create({
@@ -495,6 +496,7 @@ exports.createGiveaway = function (
       active: true,
       authorId,
       expectedWinnerCount,
+      networkName
     });
   } catch (error) {
     console.log(error);

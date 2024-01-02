@@ -13,6 +13,7 @@ var GiveawaySchema = new mongoose.Schema({
   channelId: { type: String },
   authorId: { type: String },
   expectedWinnerCount: { type: Number },
+  networkName: { type: String, default: 'nevm' },
 });
 
 Giveaway = mongoose.model('giveaways', GiveawaySchema);
