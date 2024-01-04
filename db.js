@@ -221,7 +221,8 @@ exports.createMission = function (
   currency,
   endDate,
   suggesterID,
-  suggesterPayout
+  suggesterPayout,
+  networkName
 ) {
   try {
     let data = {
@@ -234,6 +235,7 @@ exports.createMission = function (
       endTime: endDate,
       active: true,
       nevm: true,
+      networkName
     };
     if (suggesterID && suggesterPayout) {
       data = {
@@ -481,7 +483,8 @@ exports.createGiveaway = function (
   currencyID,
   endTime,
   authorId,
-  expectedWinnerCount
+  expectedWinnerCount,
+  networkName
 ) {
   try {
     return Giveaway.create({
@@ -495,6 +498,7 @@ exports.createGiveaway = function (
       active: true,
       authorId,
       expectedWinnerCount,
+      networkName
     });
   } catch (error) {
     console.log(error);

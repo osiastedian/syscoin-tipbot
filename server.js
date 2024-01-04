@@ -27,11 +27,6 @@ const axios = require("axios");
 const HDWallet = require("ethereum-hdwallet");
 const ethers = require("ethers");
 
-const provider = new ethers.providers.JsonRpcProvider(config.nevm.rpcUrl);
-const wallet = new ethers.Wallet.fromMnemonic(config.nevm.mnemonic);
-
-const signer = provider.getSigner();
-
 const BigNumber = require("bignumber.js");
 BigNumber.config({ DECIMAL_PLACES: 8 });
 BigNumber.config({ EXPONENTIAL_AT: 1e9 });
@@ -64,9 +59,6 @@ const sjs = require("syscoinjs-lib");
 const backendURL = config.blockURL;
 // 'null' for no password encryption for local storage and 'true' for testnet
 const HDSigner = new sjs.utils.HDSigner(config.mnemonic, null, config.testnet);
-const hdWallet = HDWallet.fromMnemonic(config.nevm.mnemonic).derive(
-  HDWallet.DefaultHDPath
-);
 
 var receiveIndex = ls.get("receiveIndex");
 if (receiveIndex) {
@@ -147,7 +139,7 @@ client.on("ready", () => {
 
   // Resume giveaway timers
   nevm.startGiveawayTimer();
-  nevm.resumeActiveGiveaways(client, provider);
+  nevm.resumeActiveGiveaways(client);
 });
 
 const checkHouseProfile = async () => {
@@ -284,7 +276,10 @@ client.on("message", async (message) => {
       case "dep":
       case "deposit":
         try {
-          if (args.length > 0 && args[0].toLowerCase() === "nevm") {
+          if (
+            args.length > 0 &&
+            config.evmNetworks.includes(args[0].toLowerCase())
+          ) {
             return nevm.deposit(message);
           }
           var myProfile = await db.getProfile(message.author.id);
@@ -367,8 +362,11 @@ client.on("message", async (message) => {
           message.channel.type === "dm"
         ) {
           console.log("withdawal args", args);
-          if (args.length >= 3 && args[2].toLocaleLowerCase() === "nevm") {
-            return nevm.withdraw(client, message, args, provider);
+          if (
+            args.length >= 3 &&
+            config.evmNetworks.includes(args[2].toLocaleLowerCase())
+          ) {
+            return nevm.withdraw(client, message, args);
           }
           withdraws.withdraw(args, message, client, HDSigner, syscoinjs);
         }
@@ -387,8 +385,11 @@ client.on("message", async (message) => {
             message.channel.id == config.giveawayChannel ||
             message.channel.type == "dm"
           ) {
-            if (args.length > 0 && args[0].toLowerCase() === "nevm") {
-              return nevm.balance(client, message, args, provider);
+            if (
+              args.length > 0 &&
+              config.evmNetworks.includes(args[0].toLowerCase())
+            ) {
+              return nevm.balance(client, message, args);
             }
 
             // get the relevant profile's info
@@ -861,7 +862,7 @@ client.on("message", async (message) => {
       case "paymission":
         // pay mission
         if (message.channel.id == config.missionChannel) {
-          missions.payMission(args, message, client, false, provider);
+          missions.payMission(args, message, client, false);
         }
         break;
 
@@ -1199,14 +1200,13 @@ client.on("message", async (message) => {
             return;
           }
 
-          if (args[2].toLocaleLowerCase() === "nevm") {
+          if (config.evmNetworks.includes(args[2].toLocaleLowerCase())) {
             return await nevm.send(
               client,
               message,
               args,
               myProfile,
-              await ifProfile(receiver.id),
-              provider
+              await ifProfile(receiver.id)
             );
           }
 
@@ -1418,8 +1418,10 @@ client.on("message", async (message) => {
           return;
         }
 
-        if (args.slice(-1)[0].toUpperCase() === "NEVM") {
-          return await nevm.createGiveAway(message, args, client, provider);
+        const [duration, winnerCount, amount, network] = args;
+
+        if (config.evmNetworks.includes(network.toLowerCase())) {
+          return await nevm.createGiveAway(message, args, client);
         }
 
         if (

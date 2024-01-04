@@ -13,16 +13,8 @@ const { getErc20Contract } = require("./utils/contract");
  * @param {string} walletAddress Wallet address of owner
  * @returns {Promise<number> | undefined} Balance of wallet in wei or undefined if not supported
  */
-const getTokenBalance = (provider, tokenSymbol, walletAddress) => {
-  const token = config.nevm.supportedTokens.find(
-    (token) => token.symbol === tokenSymbol.toUpperCase()
-  );
-
-  if (!token) {
-    return undefined;
-  }
-
-  const tokenContract = getErc20Contract(token.address, provider);
+const getTokenBalance = (provider, tokenAddress, walletAddress) => {
+  const tokenContract = getErc20Contract(tokenAddress, provider);
 
   return tokenContract.balanceOf(walletAddress);
 };
@@ -32,9 +24,8 @@ const getTokenBalance = (provider, tokenSymbol, walletAddress) => {
  * @param {Discord.Client} client Discord Client
  * @param {Discord.Message} message Discord message
  * @param {string[]} args Message Arguments
- * @param {ethers.providers.JsonRpcProvider} jsonProvider Ethers JSON PRC Provider
  */
-async function balance(client, message, args, jsonProvider) {
+async function balance(client, message, args) {
   const userId = message.author.id;
 
   const user = await client.users.fetch(userId);
@@ -79,12 +70,19 @@ async function balance(client, message, args, jsonProvider) {
       });
   }
 
+  const networkName = args[0].toLowerCase();
+  const networkConfig = config[networkName.toLowerCase()];
+
+  const jsonProvider = new ethers.providers.JsonRpcProvider(
+    networkConfig.rpcUrl
+  );
+
   let balanceInWei = await jsonProvider.getBalance(nevmWallet.address);
   const tokenBalances = await Promise.all(
-    config.nevm.supportedTokens.map(async (token) => {
+    networkConfig.supportedTokens.map(async (token) => {
       const balance = await getTokenBalance(
         jsonProvider,
-        token.symbol,
+        token.address,
         nevmWallet.address
       );
       return { token, balance };
@@ -95,7 +93,8 @@ async function balance(client, message, args, jsonProvider) {
       `${utils.getNevmExplorerLink(
         token.address,
         "token",
-        token.symbol
+        token.symbol,
+        networkName
       )}: ${ethers.utils.formatEther(balance)}`
   );
 
@@ -104,7 +103,7 @@ async function balance(client, message, args, jsonProvider) {
   user.send({
     embed: {
       color: constants.SUCCESS_COL,
-      description: `Hi, **<@${userId}>** Your balance is ${balanceInEth} SYS. \n ${tokenBalancesStr.join(
+      description: `Hi, **<@${userId}>** Your balance (${networkName.toUpperCase()}) is ${balanceInEth} SYS. \n ${tokenBalancesStr.join(
         "\n"
       )}`,
     },

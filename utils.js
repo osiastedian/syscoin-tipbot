@@ -1,347 +1,358 @@
-var exports = module.exports = {};
+var exports = (module.exports = {});
 
-var FAIL_EMOJI = "❌"
-var SUCCESS_EMOJI = "✅"
+var FAIL_EMOJI = "❌";
+var SUCCESS_EMOJI = "✅";
 
-const base64 = require('js-base64');
-const Discord = require('discord.js');
+const base64 = require("js-base64");
+const Discord = require("discord.js");
 
-const BigNumber = require('bignumber.js')
-const lux = require('luxon')
-const DateTime = lux.DateTime
+const BigNumber = require("bignumber.js");
+const lux = require("luxon");
+const DateTime = lux.DateTime;
 
-const c = require('./c.json')
-const config = require('./config.json')
-const backendURL = config.blockURL
+const c = require("./c.json");
+const config = require("./config.json");
+const backendURL = config.blockURL;
 const nevmExplorerURL = config.nevm.explorerURL;
 
-const sjs = require('syscoinjs-lib')
-const BN = sjs.utils.BN
+const sjs = require("syscoinjs-lib");
+const BN = sjs.utils.BN;
 
-const db = require('./db.js')
-
-// change the precision of a bignumber
-exports.toWholeUnit = function(number, precision) {
-  precision *= -1
-  return number.shiftedBy(precision)
-}
+const db = require("./db.js");
 
 // change the precision of a bignumber
-exports.toSats = function(number, precision) {
-  return number.shiftedBy(precision)
-}
+exports.toWholeUnit = function (number, precision) {
+  precision *= -1;
+  return number.shiftedBy(precision);
+};
+
+// change the precision of a bignumber
+exports.toSats = function (number, precision) {
+  return number.shiftedBy(precision);
+};
 
 // counts the number of decimals a number string has
-exports.decimalCount = function(numString) {
-  return (numString.split('.')[1] || []).length;
-}
+exports.decimalCount = function (numString) {
+  return (numString.split(".")[1] || []).length;
+};
 
 // converts a bignumber.js number to bn.js (used by syscoinjs-lib)
-exports.bigNumberToBN = function(bigNumber) {
-  return new BN(bigNumber.toString())
-}
+exports.bigNumberToBN = function (bigNumber) {
+  return new BN(bigNumber.toString());
+};
 
 // checks if the writer of the message has the Admin role
-exports.checkAdminRole = function(message) {
+exports.checkAdminRole = function (message) {
   try {
     if (!message.member.roles.cache.has(config.AdminRoleID)) {
-      return false
+      return false;
     } else {
-      return true
+      return true;
     }
   } catch (error) {
-    console.log(error)
-    message.channel.send({embed: { color: c.FAIL_COL, description: "Error checking Mission role."}});
-    return false
+    console.log(error);
+    message.channel.send({
+      embed: { color: c.FAIL_COL, description: "Error checking Mission role." },
+    });
+    return false;
   }
-}
+};
 
-exports.checkMissionRunnerRole = function(message) {
+exports.checkMissionRunnerRole = function (message) {
   try {
     if (!message.member.roles.cache.has(config.MissionRunnerRoleId)) {
-      return false
+      return false;
     } else {
-      return true
+      return true;
     }
   } catch (error) {
-    console.log(error)
-    message.channel.send({embed: { color: c.FAIL_COL, description: "Error checking MissionRunner role."}});
-    return false
+    console.log(error);
+    message.channel.send({
+      embed: {
+        color: c.FAIL_COL,
+        description: "Error checking MissionRunner role.",
+      },
+    });
+    return false;
   }
-}
+};
 
 // checks if the writer of the message has the Mission role
-exports.checkMissionRole = function(message) {
+exports.checkMissionRole = function (message) {
   try {
     if (!message.member.roles.cache.has(config.MissionRoleID)) {
-      return false
+      return false;
     } else {
-      return true
+      return true;
     }
   } catch (error) {
-    console.log(error)
-    message.channel.send({embed: { color: c.FAIL_COL, description: "Error checking Mission role."}});
-    return false
+    console.log(error);
+    message.channel.send({
+      embed: { color: c.FAIL_COL, description: "Error checking Mission role." },
+    });
+    return false;
   }
-}
+};
 
 // checks if a token exists on the backend based on the guid
 exports.getSPT = async function getSPT(guid) {
   try {
-    var token = await sjs.utils.fetchBackendAsset(backendURL, guid)
+    var token = await sjs.utils.fetchBackendAsset(backendURL, guid);
     if (token instanceof Error) {
-      return null
+      return null;
     } else {
-      return token
+      return token;
     }
   } catch (error) {
-    console.log(error)
-    return null
+    console.log(error);
+    return null;
   }
-}
+};
 
 // returns the number of decimals of the given cryptocurrency
-exports.getDecimals = async function(tokenStr) {
+exports.getDecimals = async function (tokenStr) {
   try {
     if (tokenStr !== "SYS") {
-      var token = await exports.getSPT(tokenStr)
+      var token = await exports.getSPT(tokenStr);
 
       if (token instanceof Error) {
-        return false
+        return false;
       }
 
-      return token.decimals
+      return token.decimals;
     } else {
-      return 8
+      return 8;
     }
   } catch (error) {
-    console.log(error)
-    return error
+    console.log(error);
+    return error;
   }
-}
+};
 
 // returns a string identifying the cryptocurrency (either GUID or SYS)
-exports.getCurrencyStr = async function(tokenStr) {
+exports.getCurrencyStr = async function (tokenStr) {
   try {
     if (tokenStr !== "SYS") {
-      var token = await exports.getSPT(tokenStr)
+      var token = await exports.getSPT(tokenStr);
 
       if (token instanceof Error) {
-        return false
+        return false;
       }
 
-      return token.assetGuid
+      return token.assetGuid;
     } else {
-      return "SYS"
+      return "SYS";
     }
   } catch (error) {
-    console.log(error)
-    return error
+    console.log(error);
+    return error;
   }
-}
+};
 
 // converts from the given time unit to milliseconds
-exports.convertToMillisecs = function(time, unit) {
-  unit = unit.toUpperCase()
+exports.convertToMillisecs = function (time, unit) {
+  unit = unit.toUpperCase();
   switch (unit) {
     case "D":
-      time = time.times(24)
+      time = time.times(24);
     case "H":
-      time = time.times(60)
+      time = time.times(60);
     case "M":
-      time = time.times(60)
+      time = time.times(60);
     case "S":
-      return time.times(1000)
-    break
+      return time.times(1000);
+      break;
   }
-}
+};
 
 // converts from milliseconds to minutes
-exports.fromMilliToMins = function(timeIn) {
-
+exports.fromMilliToMins = function (timeIn) {
   // seconds
-  timeIn = timeIn.dividedBy(1000)
+  timeIn = timeIn.dividedBy(1000);
 
   // minutes
-  timeIn = timeIn.dividedBy(60)
-  timeOb.time = timeIn
+  timeIn = timeIn.dividedBy(60);
+  timeOb.time = timeIn;
 
   var timeOb = {
     time: timeIn,
-    unit: "m"
-  }
+    unit: "m",
+  };
 
-  return timeOb
-}
+  return timeOb;
+};
 
 // returns whether the given balance has enough in it to send the given amount
 // expects a db Balance, and a number/string amount
-exports.hasEnoughBalance = function(balance, amount) {
+exports.hasEnoughBalance = function (balance, amount) {
   if (!balance) {
-    return false
+    return false;
   }
 
-  var amountToSend = new BigNumber(amount)
-  var balanceAmount = new BigNumber(balance.amount)
-  var availableAmount = balanceAmount.minus(balance.lockedAmount)
+  var amountToSend = new BigNumber(amount);
+  var balanceAmount = new BigNumber(balance.amount);
+  var availableAmount = balanceAmount.minus(balance.lockedAmount);
 
   if (availableAmount.lt(amountToSend)) {
-    return false
+    return false;
   }
   if (availableAmount.isNaN()) {
-    console.log("Available amount is NaN. Probably issue with lockedAmount")
-    console.log(balance)
-    return false
+    console.log("Available amount is NaN. Probably issue with lockedAmount");
+    console.log(balance);
+    return false;
   }
-  return true
-}
+  return true;
+};
 
 // returns a hyperlink to the specified blockbook address/token/tx
-exports.getExpLink = async function(data, type, title) {
+exports.getExpLink = async function (data, type, title) {
   try {
-    var url
+    var url;
     switch (type) {
       case c.ADDRESS:
-        url = `[${title}](${backendURL}/address/${data})`
-        break
+        url = `[${title}](${backendURL}/address/${data})`;
+        break;
 
       case c.TOKEN:
-        var tok = await sjs.utils.fetchBackendAsset(backendURL, data)
+        var tok = await sjs.utils.fetchBackendAsset(backendURL, data);
 
         if (tok instanceof Error) {
-          console.log("Error getting token")
-          console.log(data)
-          return false
+          console.log("Error getting token");
+          console.log(data);
+          return false;
         }
 
-        var currencyStr = base64.decode(tok.symbol) + " (" + tok.assetGuid + ")"
-        currencyStr = currencyStr.toUpperCase()
+        var currencyStr =
+          base64.decode(tok.symbol) + " (" + tok.assetGuid + ")";
+        currencyStr = currencyStr.toUpperCase();
 
-        url = `[${currencyStr}](${backendURL}/asset/${data})`
-        break
+        url = `[${currencyStr}](${backendURL}/asset/${data})`;
+        break;
 
       case c.TX:
-        url = `[${title}](${backendURL}/tx/${data})`
-        break
+        url = `[${title}](${backendURL}/tx/${data})`;
+        break;
     }
 
-    return url
+    return url;
   } catch (error) {
-    console.log(error)
-    return error
+    console.log(error);
+    return error;
   }
-}
+};
 
 /**
- * 
+ *
  * @param {string} data wallet address or token contract address or transaction hash
- * @param {('address'|'token'|'transaction')} type 
- * @param {string} title 
- * @returns 
+ * @param {('address'|'token'|'transaction')} type
+ * @param {string} title
+ * @param {string} networkName
+ * @returns
  */
-exports.getNevmExplorerLink = function (data, type, title) {
+exports.getNevmExplorerLink = function (data, type, title, networkName) {
+  const explorerURL =
+    config[networkName?.toLowerCase()]?.explorerURL ?? nevmExplorerURL;
+
   switch (type) {
     case "address":
-      return `[${title}](${nevmExplorerURL}/address/${data})`;
+      return `[${title}](${explorerURL}/address/${data})`;
 
     case "token":
-      return `[${title}](${nevmExplorerURL}/token/${data})`;
+      return `[${title}](${explorerURL}/token/${data})`;
 
     case "transaction":
-      return `[${title}](${nevmExplorerURL}/tx/${data})`;
+      return `[${title}](${explorerURL}/tx/${data})`;
   }
 };
 
 // unlocks an amount in a user's balance (locking used in auctions/trades
 // to ensure users can't move their locked funds to cheat the system)
-exports.unlockAmount = async function(currency, userID, amount) {
-  var balance = await db.getBalance(userID, currency)
-  var currentLocked = new BigNumber(balance.lockedAmount)
-  var amountBig = new BigNumber(amount)
-  var newLocked = currentLocked.minus(amountBig)
-  return db.editBalanceLocked(userID, currency, newLocked)
-}
+exports.unlockAmount = async function (currency, userID, amount) {
+  var balance = await db.getBalance(userID, currency);
+  var currentLocked = new BigNumber(balance.lockedAmount);
+  var amountBig = new BigNumber(amount);
+  var newLocked = currentLocked.minus(amountBig);
+  return db.editBalanceLocked(userID, currency, newLocked);
+};
 
 // deletes the message after the given delay in milliseconds
-exports.deleteMsgAfterDelay = function(msg, tOut) {
-  msg.delete({timeout: tOut})
-}
+exports.deleteMsgAfterDelay = function (msg, tOut) {
+  msg.delete({ timeout: tOut });
+};
 
 // reacts to a given message with the specified success/failure emoji
-exports.isSuccessMsgReact = function(isSuccess, message) {
+exports.isSuccessMsgReact = function (isSuccess, message) {
   if (message && message !== undefined) {
     if (isSuccess) {
-      message.react(SUCCESS_EMOJI)
+      message.react(SUCCESS_EMOJI);
     } else {
-      message.react(FAIL_EMOJI)
+      message.react(FAIL_EMOJI);
     }
   }
-}
+};
 
 // checks if the correct number of arguments have been provided
-exports.hasAllArgs = function(args, numOfArgs) {
-  return args.length >= numOfArgs
-}
+exports.hasAllArgs = function (args, numOfArgs) {
+  return args.length >= numOfArgs;
+};
 
 // returns the remaining time between now and the end date
-exports.getRemainingTime = function(endDate) {
-  var now = lux.DateTime.now()
-  var end = lux.DateTime.fromISO(endDate.toISOString())
+exports.getRemainingTime = function (endDate) {
+  var now = lux.DateTime.now();
+  var end = lux.DateTime.fromISO(endDate.toISOString());
 
-  return end.diff(now, ['days', 'hours', 'minutes', 'seconds'])
-}
+  return end.diff(now, ["days", "hours", "minutes", "seconds"]);
+};
 
 // returns the elapsed time between the past date and now
-exports.getElapsedTime = function(endDate) {
-  var now = lux.DateTime.now()
-  var end = lux.DateTime.fromISO(endDate.toISOString())
+exports.getElapsedTime = function (endDate) {
+  var now = lux.DateTime.now();
+  var end = lux.DateTime.fromISO(endDate.toISOString());
 
-  return now.diff(end, ['days', 'hours', 'minutes', 'seconds'])
-}
+  return now.diff(end, ["days", "hours", "minutes", "seconds"]);
+};
 
 // returns a string with days/hours/minutes/seconds remaining until the endDate
-exports.getTimeDiffStr = function(endDate, past) {
-  var diff
+exports.getTimeDiffStr = function (endDate, past) {
+  var diff;
   if (past) {
-    diff = exports.getElapsedTime(endDate)
+    diff = exports.getElapsedTime(endDate);
   } else {
-    diff = exports.getRemainingTime(endDate)
+    diff = exports.getRemainingTime(endDate);
   }
 
-  var timeLeft = ""
+  var timeLeft = "";
 
   if (diff.values.days > 0) {
-    timeLeft += `${diff.values.days} day(s), `
+    timeLeft += `${diff.values.days} day(s), `;
   }
 
   if (diff.values.hours > 0) {
-    timeLeft += `${diff.values.hours} hour(s), `
+    timeLeft += `${diff.values.hours} hour(s), `;
   }
 
   if (diff.values.minutes > 0) {
-    timeLeft += `${diff.values.minutes} minute(s), `
+    timeLeft += `${diff.values.minutes} minute(s), `;
   }
 
   if (diff.values.seconds > 0) {
-    timeLeft += `${diff.values.seconds.toFixed(0)} second(s)`
+    timeLeft += `${diff.values.seconds.toFixed(0)} second(s)`;
   }
 
-  return timeLeft
-}
+  return timeLeft;
+};
 
-exports.createNFTEmbed = async function(guid, color, desc, isThumbnail) {
-  var embed = new Discord.MessageEmbed()
-      .setColor(color)
-      .setDescription(desc)
+exports.createNFTEmbed = async function (guid, color, desc, isThumbnail) {
+  var embed = new Discord.MessageEmbed().setColor(color).setDescription(desc);
 
-  var dbSPT = await db.getSPT(guid)
+  var dbSPT = await db.getSPT(guid);
   if (dbSPT && dbSPT.linkToNFT) {
     if (isThumbnail) {
-      embed.setThumbnail(dbSPT.linkToNFT)
+      embed.setThumbnail(dbSPT.linkToNFT);
     } else {
-      embed.setImage(dbSPT.linkToNFT)
+      embed.setImage(dbSPT.linkToNFT);
     }
   }
 
-  return embed
-}
+  return embed;
+};

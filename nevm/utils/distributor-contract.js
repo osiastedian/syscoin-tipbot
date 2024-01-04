@@ -12,26 +12,23 @@ const generateDistributeFundsTransaction = async (
   addressList,
   amountPerReceiver,
   value,
+  networkConfig,
   jsonRpc
 ) => {
-  const transactionConfig = {
-    type: 2,
-    chainId: config.nevm.chainId,
-    value,
-    gasLimit:
-      config.nevm.distributor.gasLimit +
-      addressList.length * config.nevm.distributor.additionalGasPerAddress,
-    maxFeePerGas: ethers.utils.parseUnits(
-      config.nevm.distributor.missions.maxFeePerGasInGwei,
-      "gwei"
-    ),
-    maxPriorityFeePerGas: ethers.utils.parseUnits(
-      config.nevm.distributor.missions.maxPriorityFeePerGasInGwei,
-      "gwei"
-    ),
-  };
+  const defaultGasLimit =
+    networkConfig.distributor.gasLimit +
+    addressList.length * networkConfig.distributor.additionalGasPerAddress;
+  const defaultMaxFeePerGas = ethers.utils.parseUnits(
+    networkConfig.distributor.missions.maxFeePerGasInGwei,
+    "gwei"
+  );
+  const defaultMaxPriorityFeePerGas = ethers.utils.parseUnits(
+    networkConfig.distributor.missions.maxPriorityFeePerGasInGwei,
+    "gwei"
+  );
+
   const distributorContract = getDistributorContract(
-    config.nevm.distributor.address,
+    networkConfig.distributor.address,
     jsonRpc
   );
 
@@ -42,10 +39,20 @@ const generateDistributeFundsTransaction = async (
       { value }
     );
 
+  const { maxFeePerGas, maxPriorityFeePerGas } = await jsonRpc.getFeeData();
+  const gasLimit = await distributorContract.estimateGas.distribute(
+    amountPerReceiver,
+    addressList,
+    { value }
+  );
+
   return {
-    ...transactionConfig,
-    value,
+    type: 2,
+    chainId: networkConfig.chainId,
     ...distributeTransactionConfig,
+    maxFeePerGas: maxFeePerGas ?? defaultMaxFeePerGas,
+    maxPriorityFeePerGas: maxPriorityFeePerGas ?? defaultMaxPriorityFeePerGas,
+    gasLimit: gasLimit ?? defaultGasLimit,
   };
 };
 

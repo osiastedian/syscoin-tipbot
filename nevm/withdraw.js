@@ -50,7 +50,7 @@ const sendInvalidAmount = (message) => {
  * @param {WithdrawTokenProps} params
  * @returns
  */
-const generateWithdrawTransactionConfig = async (params) => {
+const generateWithdrawTransactionConfig = async (params, networkConfig) => {
   const {
     tokenSymbol,
     message,
@@ -61,7 +61,7 @@ const generateWithdrawTransactionConfig = async (params) => {
     recepientAddress,
   } = params;
   const isWithdrawAll = amount === "all";
-  const token = config.nevm.supportedTokens.find(
+  const token = networkConfig.supportedTokens.find(
     (token) => token.symbol === tokenSymbol.toUpperCase()
   );
   if (!token) {
@@ -96,9 +96,9 @@ const generateWithdrawTransactionConfig = async (params) => {
 
   const transactionConfig = {
     type: 2,
-    chainId: config.nevm.chainId,
+    chainId: networkConfig.chainId,
     value: 0,
-    gasLimit: config.nevm.tokenGasLimit,
+    gasLimit: networkConfig.tokenGasLimit,
     nonce,
     maxFeePerGas: maxFeePerGas ?? etherUtils.parseUnits("40", "gwei"),
     maxPriorityFeePerGas:
@@ -114,13 +114,12 @@ const generateWithdrawTransactionConfig = async (params) => {
  * @param {Discord.Client} client Discord Client
  * @param {Discord.Message} message Discord message
  * @param {string[]} args Command arguments
- * @param {ethers.providers.JsonRpcProvider} jsonRpc Ethers JSON PRC Provider
  */
-async function withdraw(client, message, args, jsonRpc) {
+async function withdraw(client, message, args) {
   if (args.length < 2) {
     return sendUsageExample(message);
   }
-  const [address, amount, nevmCommand, tokenSymbol] = args;
+  const [address, amount, networkName, tokenSymbol] = args;
   const isWithdrawAll = amount === "all";
 
   if (!etherUtils.isAddress(address)) {
@@ -176,17 +175,23 @@ async function withdraw(client, message, args, jsonRpc) {
       });
   }
 
+  const networkConfig = config[networkName.toLowerCase()];
+  const jsonRpc = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+
   let transactionConfig = null;
   if (tokenSymbol && tokenSymbol.toUpperCase() !== "SYS") {
-    transactionConfig = await generateWithdrawTransactionConfig({
-      tokenSymbol,
-      message,
-      jsonRpc,
-      userId,
-      amount,
-      wallet,
-      recepientAddress: address,
-    });
+    transactionConfig = await generateWithdrawTransactionConfig(
+      {
+        tokenSymbol,
+        message,
+        jsonRpc,
+        userId,
+        amount,
+        wallet,
+        recepientAddress: address,
+      },
+      networkConfig
+    );
   } else {
     const balance = await jsonRpc.getBalance(nevmWallet.address);
 
@@ -201,13 +206,18 @@ async function withdraw(client, message, args, jsonRpc) {
       return;
     }
 
-    const gasLimit = config.nevm.gasLimit;
-    const { maxFeePerGas } = await jsonRpc.getFeeData();
+    const { maxFeePerGas, maxPriorityFeePerGas } = await jsonRpc.getFeeData();
     const defaultMaxFeePerGas = etherUtils.parseUnits("10", "gwei");
-    const maxGasFee = (maxFeePerGas ?? defaultMaxFeePerGas).mul(gasLimit);
-    let value = isWithdrawAll
-      ? balance.sub(maxGasFee)
-      : etherUtils.parseEther(amount);
+    let value = etherUtils.parseEther(amount);
+    const initialTransactionConfig = {
+      type: 2,
+      chainId: networkConfig.chainId,
+      to: address,
+      value: value,
+    };
+
+    const estimatedGasLimit = jsonRpc.estimateGas(initialTransactionConfig);
+    const gasLimit = networkConfig.gasLimit;
 
     if (!value.gt(0)) {
       message.channel.send({
@@ -219,6 +229,11 @@ async function withdraw(client, message, args, jsonRpc) {
       });
       return;
     }
+
+    const maxGasFee = (maxFeePerGas ?? defaultMaxFeePerGas).mul(gasLimit);
+    value = isWithdrawAll
+      ? balance.sub(maxGasFee)
+      : etherUtils.parseEther(amount);
 
     const nonce = await jsonRpc.getTransactionCount(wallet.address);
     const minTip = etherUtils.parseUnits(`${config.tipMin}`, "ether");
@@ -235,14 +250,13 @@ async function withdraw(client, message, args, jsonRpc) {
       });
     }
     transactionConfig = {
-      type: 2,
-      chainId: config.nevm.chainId,
-      to: address,
+      ...initialTransactionConfig,
       value,
-      gasLimit,
+      gasLimit: estimatedGasLimit,
       nonce,
       maxFeePerGas,
-      maxPriorityFeePerGas: etherUtils.parseUnits("2", "gwei"),
+      maxPriorityFeePerGas:
+        maxPriorityFeePerGas ?? etherUtils.parseUnits("2", "gwei"),
     };
   }
 
@@ -253,7 +267,8 @@ async function withdraw(client, message, args, jsonRpc) {
       const explorerLink = utils.getNevmExplorerLink(
         response.hash,
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        networkName
       );
       user.send({
         embed: {
@@ -268,7 +283,8 @@ async function withdraw(client, message, args, jsonRpc) {
       const explorerLink = utils.getNevmExplorerLink(
         receipt.transactionHash,
         "transaction",
-        "Click Here to View Transaction"
+        "Click Here to View Transaction",
+        networkName
       );
       user.send({
         embed: {

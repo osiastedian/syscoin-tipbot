@@ -3,8 +3,8 @@ localStorage = new LocalStorage("../../ls");
 const Log = require("../../log");
 var nonceMap = require("../../ls");
 
-const get = (address) => {
-  const key = `nonce_${address}`;
+const get = (prefix, address) => {
+  const key = `${prefix}_nonce_${address}`;
   if (!nonceMap.get(key)) {
     return null;
   }
@@ -12,13 +12,13 @@ const get = (address) => {
   return parseNonce;
 };
 
-const set = (address, value) => {
-  const key = `nonce_${address}`;
+const set = (prefix, address, value) => {
+  const key = `${prefix}_nonce_${address}`;
   nonceMap.set(key, value);
 };
 
-const getLatestNonce = async (address, jsonRpc) => {
-  let nonce = get(address);
+const getLatestNonce = async (address, jsonRpc, prefix = "") => {
+  let nonce = get(prefix, address);
   const pendingNonce = parseInt(
     await jsonRpc.getTransactionCount(address, "pending"),
     10
@@ -29,8 +29,8 @@ const getLatestNonce = async (address, jsonRpc) => {
   } else if (nonce - pendingNonce > 1) {
     nonce = pendingNonce;
   }
-  Log.debug({finalNonce: nonce});
-  set(address, nonce + 1);
+  Log.debug({ finalNonce: nonce });
+  set(prefix, address, nonce + 1);
   return nonce;
 };
 
