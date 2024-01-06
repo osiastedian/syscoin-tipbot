@@ -195,7 +195,9 @@ async function withdraw(client, message, args) {
   } else {
     const balance = await jsonRpc.getBalance(nevmWallet.address);
 
-    if (!isWithdrawAll && etherUtils.parseEther(amount).gt(balance)) {
+    let value = isWithdrawAll ? balance : etherUtils.parseEther(amount);
+
+    if (!isWithdrawAll && value.gt(balance)) {
       message.channel.send({
         embed: {
           color: constants.FAIL_COL,
@@ -208,7 +210,6 @@ async function withdraw(client, message, args) {
 
     const { maxFeePerGas, maxPriorityFeePerGas } = await jsonRpc.getFeeData();
     const defaultMaxFeePerGas = etherUtils.parseUnits("10", "gwei");
-    let value = etherUtils.parseEther(amount);
     const initialTransactionConfig = {
       type: 2,
       chainId: networkConfig.chainId,
@@ -216,8 +217,10 @@ async function withdraw(client, message, args) {
       value: value,
     };
 
-    const estimatedGasLimit = jsonRpc.estimateGas(initialTransactionConfig);
-    const gasLimit = networkConfig.gasLimit;
+    const estimatedGasLimit = await jsonRpc.estimateGas(
+      initialTransactionConfig
+    );
+    const gasLimit = estimatedGasLimit ?? networkConfig.gasLimit;
 
     if (!value.gt(0)) {
       message.channel.send({
@@ -231,12 +234,14 @@ async function withdraw(client, message, args) {
     }
 
     const maxGasFee = (maxFeePerGas ?? defaultMaxFeePerGas).mul(gasLimit);
-    value = isWithdrawAll
-      ? balance.sub(maxGasFee)
-      : etherUtils.parseEther(amount);
+    const minTip = etherUtils.parseUnits(`0.01`, "ether");
+
+    if (isWithdrawAll) {
+      value = value.sub(minTip);
+    }
 
     const nonce = await jsonRpc.getTransactionCount(wallet.address);
-    const minTip = etherUtils.parseUnits(`${config.tipMin}`, "ether");
+
     const minimumAmount = minTip.add(maxGasFee);
 
     if (!isWithdrawAll && value.lt(minTip.add(maxGasFee))) {
@@ -249,18 +254,18 @@ async function withdraw(client, message, args) {
         },
       });
     }
+
     transactionConfig = {
       ...initialTransactionConfig,
       value,
-      gasLimit: estimatedGasLimit,
+      gasLimit,
       nonce,
       maxFeePerGas,
-      maxPriorityFeePerGas:
-        maxPriorityFeePerGas ?? etherUtils.parseUnits("2", "gwei"),
+      maxPriorityFeePerGas,
     };
   }
 
-  console.log("Sending Transaction...", wallet.address);
+  console.log("Sending Transaction...", wallet.address, transactionConfig);
   runTransaction(wallet.privateKey, transactionConfig, jsonRpc)
     .then((response) => {
       console.log("Transaction Sent!");
