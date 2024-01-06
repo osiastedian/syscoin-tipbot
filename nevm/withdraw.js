@@ -214,6 +214,7 @@ async function withdraw(client, message, args) {
       type: 2,
       chainId: networkConfig.chainId,
       to: address,
+      from: nevmWallet.address,
       value: value,
     };
 
