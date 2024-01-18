@@ -198,6 +198,23 @@ exports.getBalance = function (discordID, coinOrTokenID) {
   }
 };
 
+exports.setMarkPendingWithdrawal = function(discordID, coinOrTokenID, isPending) {
+  const updates = { hasPendingWithdrawal: isPending };
+  if(isPending)  {
+    updates.lastWithdrawalDate = new Date();
+  }
+  try {
+    return Balance.findOneAndUpdate(
+      { userID: discordID, currencyID: coinOrTokenID },
+      updates,
+      { new: true }
+    );
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
+}
+
 // find all balances held by a specific profile
 exports.getBalances = function (discordID) {
   try {

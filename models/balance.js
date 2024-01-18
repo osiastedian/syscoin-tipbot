@@ -7,7 +7,9 @@ var BalanceSchema = new mongoose.Schema({
   userID: { type: String, unique: false },
   currencyID: { type: String, unique: false },
   amount: { type: String },
-  lockedAmount: { type: String }
+  lockedAmount: { type: String },
+  hasPendingWithdrawal: { type: Boolean, default: false },
+  lastWithdrawalDate: { type: Date },
 });
 
 BalanceSchema.index({ userID: 1, currencyID: 1 }, { unique: true });

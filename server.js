@@ -172,8 +172,6 @@ client.on("message", async (message) => {
       await missions.reportSubmit(message);
     }
 
-    console.log("Message from: ", message.author.id);
-
     var splitter = message.content.replace(" ", ":splitter185151813367::");
     var fixspaces = splitter.replace(
       ":splitter185151813367:::splitter185151813367::",
@@ -206,6 +204,8 @@ client.on("message", async (message) => {
       return false;
       //No prefix detected
     }
+
+    console.log("Message from: ", message.author.id, message.content);
 
     //Check for command:
     switch (command) {
