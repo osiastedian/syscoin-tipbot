@@ -172,6 +172,8 @@ client.on("message", async (message) => {
       await missions.reportSubmit(message);
     }
 
+    console.log("Message from: ", message.author.id);
+
     var splitter = message.content.replace(" ", ":splitter185151813367::");
     var fixspaces = splitter.replace(
       ":splitter185151813367:::splitter185151813367::",
