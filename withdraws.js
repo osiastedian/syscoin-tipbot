@@ -134,6 +134,21 @@ exports.withdraw = async function(args, message, client, signer, sysjs) {
       }
       myBalance = await db.getBalance(message.author.id, currencyID)
 
+      if(myBalance.hasPendingWithdrawal) {
+        message.channel.send({embed: { color: c.FAIL_COL, description: "You have a pending withdrawal. Please wait for it to complete before making another."}})
+        return
+      }
+
+      //  30 minutes
+      const withdrawalThreshold = 30 * 60 * 1000
+
+      if(myBalance.lastWithdrawalDate && Date.now() -  myBalance.lastWithdrawalDate.getTime() < withdrawalThreshold ) {
+        message.channel.send({embed: { color: c.FAIL_COL, description: "You have made a withdrawal recently. Please wait 30 minutes before making another."}})
+        return 
+      }
+
+      await db.setMarkPendingWithdrawal(message.author.id, currencyID, true)
+
       if (!myBalance) {
         message.channel.send({embed: { color: c.FAIL_COL, description: "You don't have a registered balance for this currency."}})
         return
@@ -187,6 +202,7 @@ exports.withdraw = async function(args, message, client, signer, sysjs) {
         if (txid) {
           let updatedBalance = myBalanceAmount.sub(withdrawAmount)
           let newBalance = await db.editBalanceAmount(message.author.id, currencyID, updatedBalance)
+          await db.setMarkPendingWithdrawal(message.author.id, currencyID, false)
           let link = await utils.getExpLink(txid, c.TX, "Click here to see the transaction.")
           user.send({embed: { color: c.SUCCESS_COL, description: `Your withdrawal was successful!\n ${link}`}})
 
@@ -211,6 +227,7 @@ exports.withdraw = async function(args, message, client, signer, sysjs) {
   } catch (error) {
     console.log(error)
     message.channel.send({embed: { color: c.FAIL_COL, description: `Error withdrawing.`}})
+    await db.setMarkPendingWithdrawal(message.author.id, currencyID, false)
     return
   }
 }

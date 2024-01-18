@@ -205,6 +205,8 @@ client.on("message", async (message) => {
       //No prefix detected
     }
 
+    console.log("Message from: ", message.author.id, message.content);
+
     //Check for command:
     switch (command) {
       case "msgdbg": {
