@@ -102,6 +102,11 @@ exports.withdraw = async function(args, message, client, signer, sysjs) {
       return
     }
 
+    if(config.featureToggles.utxoWithdrawalDisabled)  {
+      message.channel.send({embed: { color: c.FAIL_COL, description: `UTXO withdrawals are currently disabled.`}})
+      return
+    }
+
     if (!utils.hasAllArgs(args, 3)) {
       message.channel.send({embed: { color: c.FAIL_COL, description: `Missing information. Usage: ${config.prefix}` + com.withdraw}})
       return
