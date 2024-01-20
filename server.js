@@ -284,6 +284,16 @@ client.on("message", async (message) => {
           ) {
             return nevm.deposit(message);
           }
+
+          if (config.featureToggles.utxoDepositDisabled) {
+            return message.channel.send({
+              embed: {
+                color: c.FAIL_COL,
+                description: `UTXO Deposits are currently disabled. Please try again later.`,
+              },
+            });
+          }
+
           var myProfile = await db.getProfile(message.author.id);
           if (myProfile) {
             let desc =
@@ -413,7 +423,10 @@ client.on("message", async (message) => {
                   // check and add any sys within the deposit address to the profile's balance
                   // new addresses are dusted to make sure explorer derives them, so check if deposit
                   // amount is greater than the 1000 sat dust
-                  if (depBalance.gt(1000)) {
+                  if (
+                    depBalance.gt(1000) &&
+                    !config.featureToggles?.utxoDepositDisabled
+                  ) {
                     var sysBalance = await db.getBalance(
                       message.author.id,
                       "SYS"
@@ -435,7 +448,10 @@ client.on("message", async (message) => {
                   }
                   // check and add any tokens within the deposit address to the profile's balances
                   var tokens = backendAccount.tokens;
-                  if (tokens != undefined) {
+                  if (
+                    tokens != undefined &&
+                    !config.featureToggles?.utxoDepositDisabled
+                  ) {
                     if (tokens.length > 0) {
                       for (var i = 0; i < tokens.length; i++) {
                         if (Number(tokens[i].balance) > 0) {
