@@ -172,6 +172,7 @@ exports.withdraw = async function(args, message, client, signer, sysjs) {
         if (value == "all") {
           withdrawAmount = new BN(myBalance.amount)
           withdrawWhole = new BigNumber(withdrawAmount).decimalPlaces(decimals, 1)
+          withdrawSat = utils.toSats(withdrawWhole, decimals)
         } else {
           // make sure the amount can't have a higher precision than is supported
           withdrawWhole = new BigNumber(value).decimalPlaces(decimals, 1)
