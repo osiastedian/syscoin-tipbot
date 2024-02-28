@@ -1,6 +1,7 @@
 # Logs
 package-lock.json
 config.json
+config.*
 ls
 qr
 logs

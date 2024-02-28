@@ -2,60 +2,52 @@
 const config = require("./config.json");
 const prefix = config.prefix;
 
+const fs = require("fs");
+const path = require("path");
+
+const defaultHelpPaths = {
+  main: "./help/main.md",
+  trade: "./help/trade.md",
+};
+
+const mainHelp = fs.readFileSync(
+  path.resolve(__dirname, process.env.HELP_MAIN_PATH ?? defaultHelpPaths.main),
+  {
+    encoding: "utf-8",
+  }
+);
+
+const mainNevmHelp = fs.readFileSync(
+  path.resolve(__dirname, "./help/main-nevm.md"),
+  {
+    encoding: "utf-8",
+  }
+);
+
+const tradeHelp = fs.readFileSync(
+  path.resolve(__dirname, defaultHelpPaths.trade),
+  {
+    encoding: "utf-8",
+  }
+);
+
+const applyContext = (rawStr, context) => {
+  return rawStr.replace(/{([^}]+)}/g, (match, key) => {
+    return context[key] || match;
+  });
+};
+
 //Constant variables - Will not and should not be changed in the code
 function getHelpCommands(parm) {
   switch (parm) {
     case "main":
-      return `
-      **Main Commands**
-      ~~--------------------~~
-      **\`${prefix}register\`**  Creates a ${config.botname} profile to send/receive ${config.ctick} and Syscoin Platform Tokens (SPTs)!
+      return applyContext(mainHelp, config);
 
-      **\`${prefix}balance\`**  Views your current ${config.ctick} and SPT balances.
-
-      **\`${prefix}deposit\`**  Gets your ${config.ctick} deposit address.
-
-      **\`${prefix}withdraw [address] [amount] [symbol/guid]\`**  Withdraw ${config.ctick} or SPTs to your personal wallet address.
-
-      **\`${prefix}tip @user [amount] [symbol/guid]\`**  Send some ${config.ctick} or SPTs to another user.
-
-      **\`${prefix}foundation\`**  Find out more about the Syscoin Foundation.
-
-      **\`${prefix}help nevm\`**  Show help NEVM commands
-
-          `;
-
-    case "main-nevm": {
-      return `**Main NEVM Commands**
-      ~~--------------------~~
-      **\`${prefix}register nevm\`**  Creates a ${config.botname} NEVM profile to send/receive ${config.ctick} and Syscoin Platform Tokens (SPTs)!
-
-      **\`${prefix}balance nevm \`**  Views your current ${config.ctick} balance and token balances.
-
-      **\`${prefix}deposit nevm\`**  Gets your ${config.ctick} deposit address.
-
-      **\`${prefix}withdraw [address] [amount] nevm [token-name]\`**  Withdraw ${config.ctick} or tokens to your personal wallet address.
-
-      **\`${prefix}tip @user [amount] nevm [token-name]\`**  Send some ${config.ctick} or tokens to another user.
-      
-          `;
-    }
+    case "main-nevm":
+      return applyContext(mainNevmHelp, config);
 
     case "trade":
-      return `
-        **Trade Commands**
-        ~~--------------------~~
-        **\`${prefix}trade [amount] [symbol/guid] for [amount] [symbol/guid] with @user\`**  Creates a trade for the given tokens with the specified user. The trade will be cancelled after ${config.tradeTime} minutes.
-
-        **\`${prefix}accept [trade ID]\`** Accepts the trade with the given trade ID.
-
-        **\`${prefix}cancel [trade ID]\`**  Cancels the trade with the given trade ID.
-
-        **\`${prefix}recent <symbol/guid>\`**  Lists some recent trades. Symbol/guid is optional; if included the list will only show trades with those tokens.
-
-            `;
-      break;
-
+      return applyContext(tradeHelp, config);
     case "auction":
       return `
         **Auction Commands**
