@@ -4,6 +4,8 @@ const config = require("../config.json");
 const utils = require("../utils");
 const HDWallet = require("ethereum-hdwallet");
 
+const { messages, applyContext } = require("../constants");
+
 const tipbotWallet = HDWallet.fromMnemonic(config.ethMnemonic).derive(
   HDWallet.DefaultHDPath
 );
@@ -33,10 +35,10 @@ async function registerNevm(client, message, args) {
       .send({
         embed: {
           color: constants.FAIL_COL,
-          description:
-            "You already registered for NEVM and Rollux on your " +
-            config.botname +
-            " profile.",
+          description: applyContext(
+            messages["register.error.registered"],
+            config
+          ),
         },
       })
       .then((msg) => {
@@ -56,7 +58,7 @@ async function registerNevm(client, message, args) {
   user.send({
     embed: {
       color: constants.SUCCESS_COL,
-      description: `You have successfully registered for NEVM on your ${config.botname} profile.\n`,
+      description: applyContext(messages["register.success"], config),
     },
   });
 }

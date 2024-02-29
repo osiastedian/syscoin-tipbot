@@ -1,0 +1,5 @@
+{
+    "register.error.registered": "You already registered for NEVM and Rollux on your {botname} profile.",
+    "register.success": "You have successfully registered for NEVM on your {botname} profile.",
+    "send.error.noWallet": "You don't have a nevm wallet yet. Use `!register nevm` to create one."
+}

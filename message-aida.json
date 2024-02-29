@@ -1,0 +1,5 @@
+{
+    "register.error.registered": "You already registered for Rollux on your {botname} profile.",
+    "register.success": "You have successfully registered for Rollux on your {botname} profile.",
+    "send.error.noWallet": "You don't have a Rollux wallet yet. Use `!register` to create one."
+}

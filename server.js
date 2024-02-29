@@ -279,8 +279,9 @@ client.on("message", async (message) => {
       case "deposit":
         try {
           if (
-            args.length > 0 &&
-            config.evmNetworks.includes(args[0].toLowerCase())
+            (args.length > 0 &&
+              config.evmNetworks.includes(args[0].toLowerCase())) ||
+            config.evmOnly
           ) {
             return nevm.deposit(message);
           }
@@ -375,8 +376,9 @@ client.on("message", async (message) => {
         ) {
           console.log("withdawal args", args);
           if (
-            args.length >= 3 &&
-            config.evmNetworks.includes(args[2].toLocaleLowerCase())
+            (args.length >= 3 &&
+              config.evmNetworks.includes(args[2].toLocaleLowerCase())) ||
+            config.evmOnly
           ) {
             return nevm.withdraw(client, message, args);
           }
@@ -398,8 +400,9 @@ client.on("message", async (message) => {
             message.channel.type == "dm"
           ) {
             if (
-              args.length > 0 &&
-              config.evmNetworks.includes(args[0].toLowerCase())
+              (args.length > 0 &&
+                config.evmNetworks.includes(args[0].toLowerCase())) ||
+              config.evmOnly
             ) {
               return nevm.balance(client, message, args);
             }
@@ -1218,7 +1221,10 @@ client.on("message", async (message) => {
             return;
           }
 
-          if (config.evmNetworks.includes(args[2].toLocaleLowerCase())) {
+          if (
+            config.evmNetworks.includes(args[2].toLocaleLowerCase()) ||
+            config.evmOnly
+          ) {
             return await nevm.send(
               client,
               message,
@@ -1252,7 +1258,10 @@ client.on("message", async (message) => {
             message.channel.id == config.giveawayChannel ||
             message.channel.type === "dm"
           ) {
-            if (args.length > 0 && args[0].toLowerCase() === "nevm") {
+            if (
+              (args.length > 0 && args[0].toLowerCase() === "nevm") ||
+              config.evmOnly
+            ) {
               return nevm.register(client, message, args);
             }
 

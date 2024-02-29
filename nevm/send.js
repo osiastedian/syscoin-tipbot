@@ -113,7 +113,12 @@ async function send(client, message, args, senderProfile, receiverProfile) {
     return sendUsageExample(message);
   }
 
-  const [argUser, argValue, argNetwork, argSymbol] = args;
+  const [
+    argUser,
+    argValue,
+    argNetwork = process.env.DEFAULT_EVM_NETWORK,
+    argSymbol = "SYS",
+  ] = args;
 
   const senderWallet = await db.nevm.getNevmWallet(senderProfile.userID);
   const receiverWallet = await db.nevm.getNevmWallet(receiverProfile.userID);

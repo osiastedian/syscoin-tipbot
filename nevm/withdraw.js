@@ -119,7 +119,12 @@ async function withdraw(client, message, args) {
   if (args.length < 2) {
     return sendUsageExample(message);
   }
-  const [address, amount, networkName, tokenSymbol] = args;
+  const [
+    address,
+    amount,
+    networkName = process.env.DEFAULT_EVM_NETWORK,
+    tokenSymbol = "SYS",
+  ] = args;
   const isWithdrawAll = amount === "all";
 
   if (!etherUtils.isAddress(address)) {

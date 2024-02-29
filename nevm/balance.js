@@ -70,7 +70,7 @@ async function balance(client, message, args) {
       });
   }
 
-  const networkName = args[0].toLowerCase();
+  const networkName = (args[0] ?? process.env.DEFAULT_EVM_NETWORK).toLowerCase();
   const networkConfig = config[networkName.toLowerCase()];
 
   const jsonProvider = new ethers.providers.JsonRpcProvider(

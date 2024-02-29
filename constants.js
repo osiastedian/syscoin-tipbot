@@ -4,6 +4,13 @@ const prefix = config.prefix;
 
 const fs = require("fs");
 const path = require("path");
+const defaultMessages = require("./message.json");
+let messages = defaultMessages;
+
+if (process.env.MESSAGE_OVERRIDE) {
+  const overrideMessages = require(process.env.MESSAGE_OVERRIDE);
+  messages = { ...messages, ...overrideMessages };
+}
 
 const defaultHelpPaths = {
   main: "./help/main.md",
@@ -128,4 +135,6 @@ function getHelpCommands(parm) {
 
 module.exports = {
   help: getHelpCommands,
+  messages,
+  applyContext,
 };
