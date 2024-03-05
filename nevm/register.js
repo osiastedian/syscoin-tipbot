@@ -54,6 +54,14 @@ async function registerNevm(client, message, args) {
     return;
   }
 
+  if (config.evmOnly) {
+    const profile = db.createProfile(message.author.id, nevmWallet.address);
+    if (!profile) {
+      console.error("registerNevm", "Profile creation failed for: ", message.author.id);
+      return;
+    }
+  }
+
   const user = await client.users.fetch(message.author.id);
   user.send({
     embed: {
