@@ -31,9 +31,17 @@ async function deposit(message) {
     });
   }
 
+  let depositAddressText = nevmWallet.address;
+
+  if (config.evmOnly && process.env.DEFAULT_EVM_NETWORK) {
+    depositAddressText = `__**${
+      config[process.env.DEFAULT_EVM_NETWORK].name
+    }**__:${depositAddressText}`;
+  }
+
   const desc =
     `Hi, **<@${message.author.id}>** Any coins/tokens sent to this address will be added to your ${config.botname} balance within a few minutes.` +
-    `\n\n:warning: IMPORTANT: Make sure that all transactions sent to this deposit address have been confirmed at least once before using the !balance command, otherwise your funds might be lost. :warning:\n\nYour personal deposit address:\n\n${nevmWallet.address}`;
+    `\n\n:warning: IMPORTANT: Make sure that all transactions sent to this deposit address have been confirmed at least once before using the !balance command, otherwise your funds might be lost. :warning:\n\nYour personal deposit address:\n\n${depositAddressText}`;
 
   let attachment = null;
   try {
