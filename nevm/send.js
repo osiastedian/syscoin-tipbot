@@ -215,7 +215,7 @@ async function send(client, message, args, senderProfile, receiverProfile) {
 
   console.log("Sending Transaction...", { transactionConfig });
 
-  runTransaction(wallet.privateKey, transactionConfig, jsonRpc)
+  runTransaction(wallet.privateKey, transactionConfig, jsonRpc, networkName)
     .then((response) => {
       console.log("Transaction Sent!");
       const explorerLink = utils.getNevmExplorerLink(
